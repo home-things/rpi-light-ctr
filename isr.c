@@ -24,7 +24,10 @@
 
 #define EVENING_FROM 20 /* hours */
 #define EVENING_UPTO 2  /* hours, must be >= 0 */
+#ifndef DURATION        /* might be defined through Makefile */
 #define DURATION 20     /* minutes, how long to be light since latest movement */
+#endif
+// #define NO_ACTIVE_TIME_LIMIT
 
 // globalCounter:
 //	Global variable to count interrupts
@@ -103,8 +106,10 @@ bool toggleLight(bool isOn)
   return isLightOn;
 }
 
-bool getEveningTime()
+// evening time
+bool getActiveTime()
 {
+#ifndef NO_ACTIVE_TIME_LIMIT
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
   const unsigned char hour = lt->tm_hour + 3;
@@ -113,13 +118,16 @@ bool getEveningTime()
   fprintf(stderr, "%d\n", hour); // print_debug
 
   return yes;
+#else
+  return true;
+#endif
 }
 void onMove(void)
 {
   print_debug("> moving <\n");
-  toggleLight((bool)getEveningTime());
+  toggleLight((bool)getActiveTime());
 
-  if (!getEveningTime())
+  if (!getActiveTime())
     print_debug("Not the evening time --> No light\n");
 
   lastMovingTime = seconds();
@@ -130,7 +138,7 @@ void checkDelay(void)
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastMovingTime);
   if (!shouldBeLight)
     print_debug("moving timeout --> turn light off\n");
-  toggleLight(getEveningTime() && shouldBeLight);
+  toggleLight(getActiveTime() && shouldBeLight);
 }
 
 void setupPins()
