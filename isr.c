@@ -1,5 +1,5 @@
-// argv: d_hot, d_cold
-// output format: yyyy-mm-ddThh:mm:ss d_hot d_cold
+// compilation & running:
+// sudo make NO_ACTIVE_TIME_LIMIT=1 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
 
 // wiringPi: digitalRead, wiringPiISR, pullUpDnControl, wiringPiSetup
 #include <wiringPi.h>
@@ -20,13 +20,14 @@
 #include "isr.h"
 #include "debounce.h"
 #include "rest.h"
-#include "cJSON/cJSON.h"
+// #include "cJSON/cJSON.h"
 
 #define EVENING_FROM (20) /* hours */
 #define EVENING_UPTO (2)  /* hours, must be >= 0 */
 #ifndef DURATION          /* might be defined through Makefile */
 #define DURATION (20)     /* minutes, how long to be light since latest movement */
 #endif
+// #define CORR_TIME (3)
 // #define NO_ACTIVE_TIME_LIMIT
 
 // globalCounter:
@@ -41,7 +42,7 @@
 #define LIGHT_PIN (3)
 #endif
 
-int lastMovingTime = 0; // sec
+int lastMovingTime = null; // sec
 bool isLightOn = false;
 bool prevMoving = false;
 unsigned long startedAt = null; // sec, since 1970 aka epoch
@@ -70,8 +71,8 @@ void date_time_str(char *result_str)
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned int hour = lt->tm_hour + 3, min = lt->tm_min;
-  char hour_s[10] = "", min_s[10] = "";
+  const unsigned int hour = lt->tm_hour + CORR_TIME, min = lt->tm_min;
+  char hour_s[4] = "", min_s[4] = "";
   int_str(hour, hour_s), int_str(min, min_s);
   strcat(result_str, hour_s), strcat(result_str, ":"), strcat(result_str, min_s);
 }
@@ -100,8 +101,7 @@ time_t seconds()
 
 bool toggleLight(bool isOn)
 {
-  if (isLightOn == isOn)
-    return isOn;
+  if (digitalRead(LIGHT_PIN) == isOn) return isOn;
   fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOn);
   system("mpg321 ./beep.mp3");
   digitalWrite(LIGHT_PIN, isOn);
@@ -112,10 +112,10 @@ bool toggleLight(bool isOn)
 // evening time
 bool getActiveTime()
 {
-#ifndef NO_ACTIVE_TIME_LIMIT
+#if NO_ACTIVE_TIME_LIMIT == 1
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned char hour = lt->tm_hour + 3;
+  const unsigned char hour = lt->tm_hour + CORR_TIME;
   const bool yes = hour >= EVENING_FROM || hour <= EVENING_UPTO;
   print_debug("hour: ");
   fprintf(stderr, "%d\n", hour); // print_debug
@@ -141,6 +141,7 @@ void checkDelay(void)
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastMovingTime);
   if (!shouldBeLight)
     print_debug("moving timeout --> turn light off\n");
+  if (!lastMovingTime) return;
   toggleLight(getActiveTime() && shouldBeLight);
 }
 
