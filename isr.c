@@ -22,10 +22,10 @@
 #include "rest.h"
 #include "cJSON/cJSON.h"
 
-#define EVENING_FROM 20 /* hours */
-#define EVENING_UPTO 2  /* hours, must be >= 0 */
-#ifndef DURATION        /* might be defined through Makefile */
-#define DURATION 20     /* minutes, how long to be light since latest movement */
+#define EVENING_FROM (20) /* hours */
+#define EVENING_UPTO (2)  /* hours, must be >= 0 */
+#ifndef DURATION          /* might be defined through Makefile */
+#define DURATION (20)     /* minutes, how long to be light since latest movement */
 #endif
 // #define NO_ACTIVE_TIME_LIMIT
 
@@ -35,8 +35,11 @@
 
 //static volatile int globalCounter [8] ;
 
-static unsigned int kitchPirS = 15; // wiringpi id; phisical: 8
-static unsigned int kitchRelay = 3; // wiringpi id; phisical: 15
+// wiringpi numbers; look at gpio readall for reference
+#ifndef PIR_S_PIN /* might be defined through Makefile */
+#define PIR_S_PIN (15)
+#define LIGHT_PIN (3)
+#endif
 
 int lastMovingTime = 0; // sec
 bool isLightOn = false;
@@ -87,7 +90,7 @@ void print_debug(const char *str)
 
 bool hasMoving(void)
 {
-  return digitalRead(kitchPirS);
+  return digitalRead(PIR_S_PIN);
 }
 
 time_t seconds()
@@ -101,7 +104,7 @@ bool toggleLight(bool isOn)
     return isOn;
   fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOn);
   system("mpg321 ./beep.mp3");
-  digitalWrite(kitchRelay, isOn);
+  digitalWrite(LIGHT_PIN, isOn);
   isLightOn = isOn;
   return isLightOn;
 }
@@ -143,17 +146,17 @@ void checkDelay(void)
 
 void setupPins()
 {
-  //pinMode(kitchPirS, INPUT);
-  //pinMode(kitchRelay, OUTPUT);
-  //pullUpDnControl(kitchPirS, PUD_DOWN); // out
+  //pinMode(PIR_S_PIN, INPUT);
+  //pinMode(LIGHT_PIN, OUTPUT);
+  //pullUpDnControl(PIR_S_PIN, PUD_DOWN); // out
 
   print_debug("wiringPiSetup\n");
   wiringPiSetup();
 
   print_debug("wiringPiISR...\n");
-  wiringPiISR(kitchPirS, INT_EDGE_RISING, &onMove); // in
+  wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &onMove); // in
 
-  isLightOn = digitalRead(kitchRelay);
+  isLightOn = digitalRead(LIGHT_PIN);
   print_debug(isLightOn ? "init: light is on\n" : "init: light is off\n");
 }
 

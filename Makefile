@@ -16,12 +16,10 @@ DEBUG	  = -O3
 CC	    = gcc
 INCLUDE	= -I/usr/local/include -I.
 CFLAGS	= -c -std=c99 $(DEBUG) -Wall $(INCLUDE) -Winline -pipe
-ifdef $(NO_ACTIVE_TIME_LIMIT)
-	CFLAGS += -DNO_ACTIVE_TIME_LIMIT
-endif
-ifdef $(DURATION)
-	CFLAGS += -DDURATION=$(DURATION)
-endif
+ifdef $(NO_ACTIVE_TIME_LIMIT); CFLAGS += -DNO_ACTIVE_TIME_LIMIT; endif
+ifdef $(DURATION); CFLAGS += -DDURATION=$(DURATION); endif
+ifdef $(LIGHT_PIN); CFLAGS += -DLIGHT_PIN=$(LIGHT_PIN); endif
+ifdef $(PIR_S_PIN); CFLAGS += -DPIR_S_PIN=$(PIR_S_PIN); endif
 
 LDFLAGS	= -L/usr/local/lib
 LDLIBS  = -lpthread -lm -lwiringPi -lwiringPiDev # -lssl -lrt (realtime) -lcrypt -lwiringPi (digitalWrite) -lwiringPiDev
