@@ -112,7 +112,7 @@ bool toggleLight(bool isOn)
 // evening time
 bool getActiveTime()
 {
-#if NO_ACTIVE_TIME_LIMIT == 1
+#if NO_ACTIVE_TIME_LIMIT != 1
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
   const unsigned char hour = lt->tm_hour + CORR_TIME;
