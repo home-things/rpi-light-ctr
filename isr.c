@@ -18,8 +18,8 @@
 #include <libgen.h>
 
 #include "isr.h"
-#include "debounce.h"
-#include "rest.h"
+// #include "debounce.h"
+// #include "rest.h"
 // #include "cJSON/cJSON.h"
 
 #define EVENING_FROM (20) /* hours */
@@ -30,12 +30,6 @@
 // #define CORR_TIME (3)
 // #define NO_ACTIVE_TIME_LIMIT
 
-// globalCounter:
-//	Global variable to count interrupts
-//	Should be declared volatile to make sure the compiler doesn't cache it.
-
-//static volatile int globalCounter [8] ;
-
 // wiringpi numbers; look at gpio readall for reference
 #ifndef PIR_S_PIN /* might be defined through Makefile */
 #define PIR_S_PIN (15)
@@ -43,7 +37,6 @@
 #endif
 
 int lastMovingTime = null; // sec
-bool isLightOn = false;
 bool prevMoving = false;
 unsigned long startedAt = null; // sec, since 1970 aka epoch
 const unsigned HOUR = 24 * 60;  // sec
@@ -99,14 +92,16 @@ time_t seconds()
   return time(NULL);
 }
 
-bool toggleLight(bool isOn)
+bool toggleLight(bool isOnNext)
 {
-  if (digitalRead(LIGHT_PIN) == isOn) return isOn;
-  fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOn);
+  // Кстати вызов нельзя кешировать глобально, т.к. свет может быть переключен снаружи
+  const bool isLightOn = digitalRead(LIGHT_PIN);
+  if (isLightOn == isOnNext)
+    return isOnNext;
+  fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOnNext);
   system("mpg321 ./beep.mp3");
-  digitalWrite(LIGHT_PIN, isOn);
-  isLightOn = isOn;
-  return isLightOn;
+  digitalWrite(LIGHT_PIN, isOnNext);
+  return isOnNext;
 }
 
 // evening time
@@ -141,7 +136,8 @@ void checkDelay(void)
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastMovingTime);
   if (!shouldBeLight)
     print_debug("moving timeout --> turn light off\n");
-  if (!lastMovingTime) return;
+  if (!lastMovingTime)
+    return;
   toggleLight(getActiveTime() && shouldBeLight);
 }
 
@@ -157,7 +153,7 @@ void setupPins()
   print_debug("wiringPiISR...\n");
   wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &onMove); // in
 
-  isLightOn = digitalRead(LIGHT_PIN);
+  const bool isLightOn = digitalRead(LIGHT_PIN);
   print_debug(isLightOn ? "init: light is on\n" : "init: light is off\n");
 }
 
@@ -179,7 +175,6 @@ int main(int argc, char *argv[])
 
   setupPins();
 
-  //printf (" Int on pin %d: Counter: %5d\n", pin, globalCounter [pin]) ;
   print_debug("waiting...\n");
 
   // nope. keep working. look to wiringPiISR that doing actual irq listening work
