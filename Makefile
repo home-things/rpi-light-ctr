@@ -24,7 +24,7 @@ CFLAGS  = -c -std=c99 $(DEBUG) -Wall $(INCLUDE) -Winline -pipe \
   -DCORR_TIME=$(CORR_TIME)
 
 LDFLAGS	= -L/usr/local/lib
-LDLIBS  = -lpthread -lm -lwiringPi -lwiringPiDev # -lssl -lrt (realtime) -lcrypt -lwiringPi (digitalWrite) -lwiringPiDev
+LDLIBS  = -lpthread -lm -lwiringPi -lwiringPiDev -lmosquitto # -lssl -lrt (realtime) -lcrypt -lwiringPi (digitalWrite) -lwiringPiDev
 
 # Should not alter anything below this line
 ###############################################################################
