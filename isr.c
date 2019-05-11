@@ -64,10 +64,11 @@ void date_time_str(char *result_str)
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned int hour = lt->tm_hour + CORR_TIME, min = lt->tm_min;
-  char hour_s[4] = "", min_s[4] = "";
-  int_str(hour, hour_s), int_str(min, min_s);
-  strcat(result_str, hour_s), strcat(result_str, ":"), strcat(result_str, min_s);
+  const unsigned int mon = lt->tm_mon, day = lt->tm_mday, hour = lt->tm_hour + CORR_TIME, min = lt->tm_min;
+  char mon_s[4] = "", day_s[4] = "", hour_s[4] = "", min_s[4] = "";
+  int_str(mon, mon_s), int_str(day, day_s),  int_str(hour, hour_s), int_str(min, min_s);
+  strcat(result_str, mon_s), strcat(result_str, "/"), strcat(result_str, day_s);
+  strcat(result_str, " "), strcat(result_str, hour_s), strcat(result_str, ":"), strcat(result_str, min_s);
 }
 
 void print_debug(const char *str)
@@ -96,10 +97,10 @@ bool toggleLight(bool isOnNext)
 {
   // Кстати вызов нельзя кешировать глобально, т.к. свет может быть переключен снаружи
   const bool isLightOn = digitalRead(LIGHT_PIN);
-  if (isLightOn == isOnNext)
-    return isOnNext;
-  fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOnNext);
-  system("mpg321 ./beep.mp3");
+  if (isLightOn != isOnNext) {
+    fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOnNext);
+    system("mpg321 ./beep.mp3");
+  }
   digitalWrite(LIGHT_PIN, isOnNext);
   return isOnNext;
 }
