@@ -1,5 +1,5 @@
 // compilation & running:
-// sudo make NO_ACTIVE_TIME_LIMIT=1 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
+// sudo make ACTIVE_TIME_LIMIT=0 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
 
 // wiringPi: digitalRead, wiringPiISR, pullUpDnControl, wiringPiSetup
 #include <wiringPi.h>
@@ -28,7 +28,7 @@
 #define DURATION (20)     /* minutes, how long to be light since latest movement */
 #endif
 // #define CORR_TIME (3)
-// #define NO_ACTIVE_TIME_LIMIT
+// #define ACTIVE_TIME_LIMIT
 
 // wiringpi numbers; look at gpio readall for reference
 #ifndef PIR_S_PIN /* might be defined through Makefile */
@@ -108,7 +108,7 @@ bool toggleLight(bool isOnNext)
 // evening time
 bool getActiveTime()
 {
-#if NO_ACTIVE_TIME_LIMIT != 1
+#if ACTIVE_TIME_LIMIT == 1
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
   const unsigned char hour = lt->tm_hour + CORR_TIME;
