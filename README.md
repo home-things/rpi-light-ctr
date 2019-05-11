@@ -5,7 +5,7 @@ Hub repo: [home-things/rpi-tg-bot](https://github.com/home-things/rpi-tg-bot)
 
 ### compile & run
 ```
-sudo make NO_ACTIVE_TIME_LIMIT=0 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
+sudo make ACTIVE_TIME_LIMIT=1 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
 ```
 
 ### crontab
