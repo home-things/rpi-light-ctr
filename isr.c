@@ -97,12 +97,11 @@ bool toggleLight(bool isOnNext)
 {
   // Кстати вызов нельзя кешировать глобально, т.к. свет может быть переключен снаружи
   const bool isLightOn = digitalRead(LIGHT_PIN);
+  digitalWrite(LIGHT_PIN, isOnNext);
   if (isLightOn != isOnNext) {
     fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOnNext);
+    if (!isLightOn) system("mpg321 ./beep.mp3");
   }
-  if (!isLightOn)
-    system("mpg321 ./beep.mp3");
-  digitalWrite(LIGHT_PIN, isOnNext);
   return isOnNext;
 }
 
