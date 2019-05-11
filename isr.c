@@ -99,8 +99,9 @@ bool toggleLight(bool isOnNext)
   const bool isLightOn = digitalRead(LIGHT_PIN);
   if (isLightOn != isOnNext) {
     fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOnNext);
-    system("mpg321 ./beep.mp3");
   }
+  if (!isLightOn)
+    system("mpg321 ./beep.mp3");
   digitalWrite(LIGHT_PIN, isOnNext);
   return isOnNext;
 }
