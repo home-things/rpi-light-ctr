@@ -21,14 +21,29 @@
 // #include "debounce.h"
 // #include "rest.h"
 // #include "cJSON/cJSON.h"
+#include "mqtt.h"
 
 #define EVENING_FROM (20) /* hours */
 #define EVENING_UPTO (2)  /* hours, must be >= 0 */
-#ifndef DURATION          /* might be defined through Makefile */
-#define DURATION (20)     /* minutes, how long to be light since latest movement */
+
+#ifndef DURATION      /* might be defined through Makefile */
+#define DURATION (20) /* minutes, how long to be light since latest movement */
 #endif
-// #define CORR_TIME (3)
-// #define ACTIVE_TIME_LIMIT
+
+#ifndef CORR_TIME
+#define CORR_TIME 0
+#endif
+
+#ifndef ACTIVE_TIME_LIMIT
+#define ACTIVE_TIME_LIMIT 0
+#endif
+
+// as a mqtt client this app will be use mqtt signals instead local sensor pin
+#ifndef MQTT_CLIENT
+#define MQTT_CLIENT 0
+#define MQTT_TOPIC "home/light"
+#define MQTT_BROKER_HOST "localhost"
+#endif
 
 // wiringpi numbers; look at gpio readall for reference
 #ifndef PIR_S_PIN /* might be defined through Makefile */
@@ -66,7 +81,7 @@ void date_time_str(char *result_str)
   struct tm *lt = localtime(&t);
   const unsigned int mon = lt->tm_mon, day = lt->tm_mday, hour = lt->tm_hour + CORR_TIME, min = lt->tm_min;
   char mon_s[4] = "", day_s[4] = "", hour_s[4] = "", min_s[4] = "";
-  int_str(mon, mon_s), int_str(day, day_s),  int_str(hour, hour_s), int_str(min, min_s);
+  int_str(mon, mon_s), int_str(day, day_s), int_str(hour, hour_s), int_str(min, min_s);
   strcat(result_str, mon_s), strcat(result_str, "/"), strcat(result_str, day_s);
   strcat(result_str, " "), strcat(result_str, hour_s), strcat(result_str, ":"), strcat(result_str, min_s);
 }
@@ -98,9 +113,14 @@ bool toggleLight(bool isOnNext)
   // Кстати вызов нельзя кешировать глобально, т.к. свет может быть переключен снаружи
   const bool isLightOn = digitalRead(LIGHT_PIN);
   digitalWrite(LIGHT_PIN, isOnNext);
-  if (isLightOn != isOnNext) {
-    fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOnNext);
-    if (!isLightOn) system("mpg321 ./beep.mp3");
+  if (isLightOn != isOnNext)
+  {
+    char date_time[40] = "";
+    date_time_str(date_time);
+
+    fprintf(stderr, "%s: effective toggle light. current: %d / request: %d\n", date_time, isLightOn, isOnNext);
+    if (!isLightOn)
+      system("mpg321 ./beep.mp3");
   }
   return isOnNext;
 }
@@ -130,15 +150,18 @@ void onMove(void)
     print_debug("Not the evening time --> No light\n");
 
   lastMovingTime = seconds();
+#if MQTT_CLIENT == 0
+  mqtt_send("mov", MQTT_TOPIC);
+#endif
 }
 void checkDelay(void)
 {
   bool shouldBeLight = seconds() - lastMovingTime <= DURATION * MIN;
+  if (!lastMovingTime)
+    return;
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastMovingTime);
   if (!shouldBeLight)
     print_debug("moving timeout --> turn light off\n");
-  if (!lastMovingTime)
-    return;
   toggleLight(getActiveTime() && shouldBeLight);
 }
 
@@ -175,6 +198,8 @@ int main(int argc, char *argv[])
   setbuf(stderr, NULL); // disable buffering. write logs immediately for best reliability
 
   setupPins();
+
+  mqtt_setup(MQTT_BROKER_HOST);
 
   print_debug("waiting...\n");
 
