@@ -1,5 +1,5 @@
 # rpi-light-ctr
-Yet another light controller for raspberry pi. ISR Interruptons. C 
+Yet another light controller for raspberry pi. ISR Interruptons. optional MQTT. C 
 
 Hub repo: [home-things/rpi-tg-bot](https://github.com/home-things/rpi-tg-bot)
 
@@ -16,4 +16,4 @@ sudo make ACTIVE_TIME_LIMIT=1 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
 ```
  ### pre-requisites
  `sudo apt install mpg321` # optional dependency for beeping
- 
+ `sudo apt-get -y install libmosquitto-dev mosquitto-dev` # for mqtt server/client
