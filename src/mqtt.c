@@ -27,13 +27,50 @@ void mosq_log_callback(struct mosquitto *mosq, void *userdata, int level, const 
   }
 }
 
+
+static int run = 1;
+
+void handle_signal(int s)
+{
+	run = 0;
+}
+
+void connect_callback(struct mosquitto *mosq, void *obj, int result)
+{
+	printf("connect callback, rc=%d\n", result);
+}
+
+// example
+void message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message)
+{
+	bool match = 0;
+	printf("got message '%.*s' for topic '%s'\n", message->payloadlen, (char*) message->payload, message->topic);
+
+	mosquitto_topic_matches_sub("/home/#", message->topic, &match);
+	if (match) {
+		printf("got message for home topic\n");
+	}
+}
+
 struct mosquitto *mosq = NULL;
+
+
+
+
+
+
+
 void mqtt_setup(char *broker_host)
 {
 
   int port = 1883;
   int keepalive = 60;
   bool clean_session = true;
+
+
+	signal(SIGINT, handle_signal);
+	signal(SIGTERM, handle_signal);
+
 
   mosquitto_lib_init();
   mosq = mosquitto_new(NULL, clean_session, NULL);
@@ -44,6 +81,9 @@ void mqtt_setup(char *broker_host)
   }
 
   mosquitto_log_callback_set(mosq, mosq_log_callback);
+  mosquitto_connect_callback_set(mosq, connect_callback);
+  mosquitto_message_callback_set(mosq, message_callback);
+
 
   if (mosquitto_connect(mosq, broker_host, port, keepalive))
   {
