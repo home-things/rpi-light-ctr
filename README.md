@@ -15,5 +15,5 @@ sudo make ACTIVE_TIME_LIMIT=1 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
 @reboot cd /home/pi/services/light-ctr; ./isr 2>>./log
 ```
  ### pre-requisites
- `sudo apt install mpg321` # optional dependency for beeping
- `sudo apt-get -y install libmosquitto-dev mosquitto-dev` # for mqtt server/client
+-  `sudo apt install mpg321` # optional dependency for beeping
+-  `sudo apt-get -y install libmosquitto-dev mosquitto-dev` # for mqtt server/client
