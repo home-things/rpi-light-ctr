@@ -60,5 +60,39 @@ void mqtt_setup(char *broker_host)
 
 int mqtt_send(char *msg, char *topic)
 {
+  /*
+    https://mosquitto.org/api/files/mosquitto-h.html#mosquitto_publish
+    int mosquitto_publish(
+      mosquitto 	*	mosq,
+      int 	          *	mid,
+      const 	char 	*	topic,
+      int 		        payloadlen,
+      const 	void 	*	payload,
+      int 		        qos,
+      bool 		        retain
+    )
+
+    @returns
+    MOSQ_ERR_SUCCESS	on success.
+    MOSQ_ERR_INVAL	if the input parameters were invalid.
+    MOSQ_ERR_NOMEM	if an out of memory condition occurred.
+    MOSQ_ERR_NO_CONN	if the client isn’t connected to a broker.
+    MOSQ_ERR_PROTOCOL	if there is a protocol error communicating with the broker.
+    MOSQ_ERR_PAYLOAD_SIZE	if payloadlen is too large.
+    MOSQ_ERR_MALFORMED_UTF8	if the topic is not valid UTF-8
+  */
   return mosquitto_publish(mosq, NULL, topic, strlen(msg), msg, 0, 0);
+}
+
+int mqtt_subscribe(char *cb, char *topic)
+{
+  /*
+    int mosquitto_subscribe(
+      mosquitto 	  *	mosq,
+      int 	        *	mid,
+      const 	char 	*	sub,
+      int 		      qos
+    )
+  */
+  return mosquitto_subscribe(mosq, NULL, topic, strlen(msg), msg, 0, 0);
 }
