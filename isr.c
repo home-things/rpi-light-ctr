@@ -38,9 +38,9 @@
 #define ACTIVE_TIME_LIMIT 0
 #endif
 
-// as a mqtt client this app will be use mqtt signals instead local sensor pin
-#ifndef MQTT_CLIENT
-#define MQTT_CLIENT 0
+// as a mqtt subscriber this app will be use mqtt signals instead local sensor pin
+#ifndef MQTT_SUBSCRIBE
+#define MQTT_SUBSCRIBE 0
 #define MQTT_TOPIC "home/light"
 #define MQTT_BROKER_HOST "localhost"
 #endif
@@ -51,9 +51,9 @@
 #define LIGHT_PIN (3)
 #endif
 
-int lastMovingTime = null; // sec
-bool prevMoving = false;
-unsigned long startedAt = null; // sec, since 1970 aka epoch
+int last_moving_time = null; // sec
+bool prev_moving = false;
+unsigned long started_at = null; // sec, since 1970 aka epoch
 const unsigned HOUR = 24 * 60;  // sec
 const unsigned MIN = 60;        // sec
 
@@ -98,7 +98,7 @@ void print_debug(const char *str)
   fprintf(stderr, buf);
 }
 
-bool hasMoving(void)
+bool has_moving(void)
 {
   return digitalRead(PIR_S_PIN);
 }
@@ -108,7 +108,7 @@ time_t seconds()
   return time(NULL);
 }
 
-bool toggleLight(bool isOnNext)
+bool toggle_tight(bool isOnNext)
 {
   // Кстати вызов нельзя кешировать глобально, т.к. свет может быть переключен снаружи
   const bool isLightOn = digitalRead(LIGHT_PIN);
@@ -126,7 +126,7 @@ bool toggleLight(bool isOnNext)
 }
 
 // evening time
-bool getActiveTime()
+bool get_active_time()
 {
 #if ACTIVE_TIME_LIMIT == 1
   time_t t = time(NULL);
@@ -141,31 +141,32 @@ bool getActiveTime()
   return true;
 #endif
 }
-void onMove(void)
+void on_move(void)
 {
   print_debug("> moving <\n");
-  toggleLight((bool)getActiveTime());
+  toggle_tight((bool)get_active_time());
 
-  if (!getActiveTime())
+  if (!get_active_time())
     print_debug("Not the evening time --> No light\n");
 
-  lastMovingTime = seconds();
-#if MQTT_CLIENT == 0
+  last_moving_time = seconds();
+#if MQTT_SUBSCRIBE == 0
+  // as mqtt publisher
   mqtt_send("mov", MQTT_TOPIC);
 #endif
 }
-void checkDelay(void)
+void check_delay(void)
 {
-  bool shouldBeLight = seconds() - lastMovingTime <= DURATION * MIN;
-  if (!lastMovingTime)
+  bool shouldBeLight = seconds() - last_moving_time <= DURATION * MIN;
+  if (!last_moving_time)
     return;
-  fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastMovingTime);
+  fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - last_moving_time);
   if (!shouldBeLight)
     print_debug("moving timeout --> turn light off\n");
-  toggleLight(getActiveTime() && shouldBeLight);
+  toggle_tight(get_active_time() && shouldBeLight);
 }
 
-void setupPins()
+void setup_pins()
 {
   //pinMode(PIR_S_PIN, INPUT);
   //pinMode(LIGHT_PIN, OUTPUT);
@@ -175,7 +176,7 @@ void setupPins()
   wiringPiSetup();
 
   print_debug("wiringPiISR...\n");
-  wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &onMove); // in
+  wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &on_move); // in
 
   const bool isLightOn = digitalRead(LIGHT_PIN);
   print_debug(isLightOn ? "init: light is on\n" : "init: light is off\n");
@@ -183,7 +184,7 @@ void setupPins()
 
 // // @returns epoch secs
 // unsigned long getTimestamp () {
-//   return startedAt + seconds();
+//   return started_at + seconds();
 // }
 
 /*
@@ -197,7 +198,7 @@ int main(int argc, char *argv[])
   setbuf(stdout, NULL); // disable buffering. write logs immediately for best reliability
   setbuf(stderr, NULL); // disable buffering. write logs immediately for best reliability
 
-  setupPins();
+  setup_pins();
 
   mqtt_setup(MQTT_BROKER_HOST);
 
@@ -206,7 +207,7 @@ int main(int argc, char *argv[])
   // nope. keep working. look to wiringPiISR that doing actual irq listening work
   for (;;)
   {
-    checkDelay();
+    check_delay();
     sleep(15); // seconds
   }
 

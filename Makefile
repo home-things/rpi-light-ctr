@@ -21,7 +21,10 @@ CFLAGS  = -c -std=c99 $(DEBUG) -Wall $(INCLUDE) -Winline -pipe \
   -DDURATION=$(DURATION) \
   -DLIGHT_PIN=$(LIGHT_PIN) \
   -DPIR_S_PIN=$(PIR_S_PIN) \
-  -DCORR_TIME=$(CORR_TIME)
+  -DCORR_TIME=$(CORR_TIME) \
+  -DMQTT_BROKER_HOST=$(MQTT_BROKER_HOST) \
+  -DMQTT_TOPIC=$(MQTT_TOPIC) \
+  -DMQTT_SUBSCRIBE=$(MQTT_SUBSCRIBE)
 
 LDFLAGS	= -L/usr/local/lib
 LDLIBS  = -lpthread -lm -lwiringPi -lwiringPiDev -lmosquitto # -lssl -lrt (realtime) -lcrypt -lwiringPi (digitalWrite) -lwiringPiDev
