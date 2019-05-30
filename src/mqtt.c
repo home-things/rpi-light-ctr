@@ -124,15 +124,15 @@ int mqtt_send(char *msg, char *topic)
   return mosquitto_publish(mosq, NULL, topic, strlen(msg), msg, 0, 0);
 }
 
-int mqtt_subscribe(char *cb, char *topic)
-{
-  /*
-    int mosquitto_subscribe(
-      mosquitto 	  *	mosq,
-      int 	        *	mid,
-      const 	char 	*	sub,
-      int 		      qos
-    )
-  */
-  return mosquitto_subscribe(mosq, NULL, topic, strlen(msg), msg, 0, 0);
-}
+// int mqtt_subscribe(char *cb, char *topic)
+// {
+//   /*
+//     int mosquitto_subscribe(
+//       mosquitto 	  *	mosq,
+//       int 	        *	mid,
+//       const 	char 	*	sub,
+//       int 		      qos
+//     )
+//   */
+//   return mosquitto_subscribe(mosq, NULL, topic, strlen(msg), msg, 0, 0);
+// }

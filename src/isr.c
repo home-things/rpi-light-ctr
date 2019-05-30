@@ -187,7 +187,7 @@ void setup_pins()
   // as mqtt subscriber
   wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &on_move); // in
 #else
-  mqtt_subscribe(&on_move);
+  // mqtt_subscribe(&on_move);
 #endif
   const bool isLightOn = digitalRead(LIGHT_PIN);
   print_debug(isLightOn ? "init: light is on\n" : "init: light is off\n");
