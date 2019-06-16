@@ -51,6 +51,8 @@
 #define LIGHT_PIN (3)
 #endif
 
+#define STR "
+
 int last_moving_time = null; // sec
 bool prev_moving = false;
 unsigned long started_at = null; // sec, since 1970 aka epoch
@@ -211,7 +213,7 @@ int main(int argc, char *argv[])
 
   setup_pins();
 
-  mqtt_setup(MQTT_BROKER_HOST);
+  mqtt_setup(STR##MQTT_BROKER_HOST##STR);
 
   print_debug("waiting...\n");
 
