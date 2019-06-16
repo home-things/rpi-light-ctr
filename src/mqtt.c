@@ -17,9 +17,10 @@ void mosq_log_callback(struct mosquitto *mosq, void *userdata, int level, const 
 
   switch (level)
   {
-  //case MOSQ_LOG_DEBUG:
-  //case MOSQ_LOG_INFO:
-  //case MOSQ_LOG_NOTICE:
+  case MOSQ_LOG_DEBUG:
+  case MOSQ_LOG_INFO:
+  case MOSQ_LOG_NOTICE:
+
   case MOSQ_LOG_WARNING:
   case MOSQ_LOG_ERR:
   {
@@ -77,9 +78,11 @@ void mqtt_setup(char *broker_host)
   mosq = mosquitto_new(NULL, clean_session, NULL);
   if (!mosq)
   {
-    fprintf(stderr, "Error: Out of memory.\n");
+    fprintf(stderr, "MQTT Error: Out of memory.\n");
     exit(1);
   }
+
+  fprintf(stderr, "MQTT: Success");
 
   mosquitto_log_callback_set(mosq, mosq_log_callback);
   mosquitto_connect_callback_set(mosq, connect_callback);
@@ -88,13 +91,13 @@ void mqtt_setup(char *broker_host)
 
   if (mosquitto_connect(mosq, broker_host, port, keepalive))
   {
-    fprintf(stderr, "Unable to connect.\n");
+    fprintf(stderr, "MQTT Error: Unable to connect.\n");
     exit(1);
   }
   int loop = mosquitto_loop_start(mosq);
   if (loop != MOSQ_ERR_SUCCESS)
   {
-    fprintf(stderr, "Unable to start loop: %i\n", loop);
+    fprintf(stderr, "MQTT Error: Unable to start loop: %i\n", loop);
     exit(1);
   }
 }

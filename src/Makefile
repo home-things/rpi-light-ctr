@@ -23,7 +23,7 @@ CFLAGS  = -c -std=c99 $(DEBUG) -Wall $(INCLUDE) -Winline -pipe \
   -DPIR_S_PIN=$(PIR_S_PIN) \
   -DCORR_TIME=$(CORR_TIME) \
   -DMQTT_BROKER_HOST="\"$(MQTT_BROKER_HOST)\"" \
-  -DMQTT_TOPIC=$(MQTT_TOPIC) \
+  -DMQTT_TOPIC="\"$(MQTT_TOPIC)\"" \
   -DMQTT_SUBSCRIBE=$(MQTT_SUBSCRIBE)
 
 LDFLAGS	= -L/usr/local/lib
