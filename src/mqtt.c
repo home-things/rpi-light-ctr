@@ -15,6 +15,8 @@ void mosq_log_callback(struct mosquitto *mosq, void *userdata, int level, const 
 {
   /* Pring all log messages regardless of level. */
 
+  fprintf(stderr, "log: %i:%s\n", level, str);
+
   switch (level)
   {
   case MOSQ_LOG_DEBUG:
@@ -82,12 +84,10 @@ void mqtt_setup(char *broker_host)
     exit(1);
   }
 
-  fprintf(stderr, "MQTT: Success");
 
   mosquitto_log_callback_set(mosq, mosq_log_callback);
   mosquitto_connect_callback_set(mosq, connect_callback);
   mosquitto_message_callback_set(mosq, message_callback);
-
 
   if (mosquitto_connect(mosq, broker_host, port, keepalive))
   {
@@ -100,6 +100,9 @@ void mqtt_setup(char *broker_host)
     fprintf(stderr, "MQTT Error: Unable to start loop: %i\n", loop);
     exit(1);
   }
+
+  fprintf(stderr, "MQTT: Success\n");
+
 }
 
 int mqtt_send(char *msg, char *topic)
