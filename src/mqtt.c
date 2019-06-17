@@ -94,7 +94,7 @@ void mqtt_setup(char *broker_host)
     fprintf(stderr, "MQTT Error: Unable to connect.\n");
     exit(1);
   }
-  int loop = mosquitto_loop_start(mosq);
+  int loop = mosquitto_loop_forever(mosq, -1, 1);
   if (loop != MOSQ_ERR_SUCCESS)
   {
     fprintf(stderr, "MQTT Error: Unable to start loop: %i\n", loop);
