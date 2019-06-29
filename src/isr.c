@@ -150,10 +150,10 @@ void on_move(void)
     print_debug("Not the evening time --> No light\n");
 
   last_moving_time = seconds();
-#if MQTT_SUBSCRIBE == 0
-  // as mqtt publisher
-  mqtt_send("mov", MQTT_TOPIC);
-#endif
+  // #if MQTT_SUBSCRIBE == 0
+  //   // as mqtt publisher
+  //   mqtt_send("mov", MQTT_TOPIC);
+  // #endif
 }
 void check_delay(void)
 {
@@ -183,12 +183,12 @@ void setup_pins()
 
   print_debug("wiringPiISR...\n");
 
-#if MQTT_SUBSCRIBE != 0
+  // #if MQTT_SUBSCRIBE != 0
   // as mqtt subscriber
   wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &on_move); // in
-#else
-  mqtt_subscribe(&on_move);
-#endif
+                                                     // #else
+                                                     //   mqtt_subscribe(&on_move);
+                                                     // #endif
   const bool isLightOn = digitalRead(LIGHT_PIN);
   print_debug(isLightOn ? "init: light is on\n" : "init: light is off\n");
 }
