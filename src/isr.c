@@ -21,7 +21,7 @@
 // #include "debounce.h"
 // #include "rest.h"
 // #include "cJSON/cJSON.h"
-#include "mqtt.h"
+// #include "mqtt.h"
 
 #define EVENING_FROM (20) /* hours */
 #define EVENING_UPTO (2)  /* hours, must be >= 0 */
@@ -54,8 +54,8 @@
 int last_moving_time = null; // sec
 bool prev_moving = false;
 unsigned long started_at = null; // sec, since 1970 aka epoch
-const unsigned HOUR = 24 * 60;  // sec
-const unsigned MIN = 60;        // sec
+const unsigned HOUR = 24 * 60;   // sec
+const unsigned MIN = 60;         // sec
 
 // // get time in seconds
 // unsigned getSunset()
@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 
   setup_pins();
 
-  mqtt_setup(MQTT_BROKER_HOST);
+  // mqtt_setup(MQTT_BROKER_HOST);
 
   print_debug("waiting...\n");
 
