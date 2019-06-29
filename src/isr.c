@@ -161,9 +161,15 @@ void check_delay(void)
   if (!last_moving_time)
     return;
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - last_moving_time);
+  /*
+   * don't turn-on by the timer.
+   * usecase: light might be turnel off via switch button or api
+  */
   if (!shouldBeLight)
+  {
     print_debug("moving timeout --> turn light off\n");
-  toggle_tight(get_active_time() && shouldBeLight);
+    toggle_tight(get_active_time() && shouldBeLight);
+  }
 }
 
 void setup_pins()
