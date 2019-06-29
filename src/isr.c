@@ -54,8 +54,8 @@
 int last_moving_time = null; // sec
 bool prev_moving = false;
 unsigned long started_at = null; // sec, since 1970 aka epoch
-const unsigned HOUR = 24 * 60;  // sec
-const unsigned MIN = 60;        // sec
+const unsigned HOUR = 24 * 60;   // sec
+const unsigned MIN = 60;         // sec
 
 // // get time in seconds
 // unsigned getSunset()
@@ -155,9 +155,13 @@ void on_move(void)
   mqtt_send("mov", MQTT_TOPIC);
 #endif
 }
+
+// todo: add compatibility with external switch, homebridge etc.
+
 void check_delay(void)
 {
   bool shouldBeLight = seconds() - last_moving_time <= DURATION * MIN;
+  fprintf(stderr, "last_moving_time: %d", last_moving_time);
   if (!last_moving_time)
     return;
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - last_moving_time);
