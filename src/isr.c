@@ -143,13 +143,13 @@ bool get_active_time()
 }
 void on_move(void)
 {
+  last_moving_time = seconds();
+
   print_debug("> moving <\n");
   toggle_tight((bool)get_active_time());
 
   if (!get_active_time())
     print_debug("Not the evening time --> No light\n");
-
-  last_moving_time = seconds();
   // #if MQTT_SUBSCRIBE == 0
   //   // as mqtt publisher
   //   mqtt_send("mov", MQTT_TOPIC);
