@@ -22,8 +22,8 @@
 #include "rest.h"
 #include "cJSON/cJSON.h"
 
-#define EVENING_FROM 20 /* hours */
-#define EVENING_UPTO 2  /* hours, must be >= 0 */
+#define EVENING_FROM 16 /* hours */
+#define EVENING_UPTO 1  /* hours, must be >= 0 */
 #define DURATION 20     /* minutes, how long to be light since latest movement */
 
 // globalCounter:
