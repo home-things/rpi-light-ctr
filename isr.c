@@ -38,7 +38,7 @@ static unsigned int kitchRelay = 3; // wiringpi id; phisical: 15
 int lastMovingTime = 0; // sec
 bool isLightOn = false;
 bool prevMoving = false;
-unsigned long startedAt = null; // sec, since 1970 aka epoch
+unsigned long startedAt = null;
 const unsigned HOUR = 24 * 60;  // sec
 const unsigned MIN = 60;        // sec
 
@@ -149,11 +149,6 @@ void setupPins()
   print_debug(isLightOn ? "init: light is on\n" : "init: light is off\n");
 }
 
-// // @returns epoch secs
-// unsigned long getTimestamp () {
-//   return startedAt + seconds();
-// }
-
 /*
  *********************************************************************************
  * main
@@ -165,15 +160,21 @@ int main(int argc, char *argv[])
   setbuf(stdout, NULL); // disable buffering. write logs immediately for best reliability
   setbuf(stderr, NULL); // disable buffering. write logs immediately for best reliability
 
+  startedAt = seconds();
+
   setupPins();
 
   //printf (" Int on pin %d: Counter: %5d\n", pin, globalCounter [pin]) ;
   print_debug("waiting...\n");
 
-  // nope. keep working. look to wiringPiISR that doing actual irq listening work
+  if (getEveningTime())
+    lastMovingTime = seconds();
+
   for (;;)
   {
-    checkDelay();
+    // Не начинать проверки сразу после старта
+    if (seconds() - startedAt >= DURATION * 60) checkDelay();
+
     sleep(15); // seconds
   }
 
