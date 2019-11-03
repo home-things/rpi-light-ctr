@@ -116,13 +116,13 @@ bool getEveningTime()
 }
 void onMove(void)
 {
+  lastMovingTime = seconds();
+
   print_debug("> moving <\n");
   toggleLight((bool)getEveningTime());
 
   if (!getEveningTime())
     print_debug("Not the evening time --> No light\n");
-
-  lastMovingTime = seconds();
 }
 void checkDelay(void)
 {
