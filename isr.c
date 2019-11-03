@@ -22,6 +22,8 @@
 #include "rest.h"
 #include "cJSON/cJSON.h"
 
+// #include "signal.h" -- пытались получать через SIGUSR сингалы с homekit
+
 #define EVENING_FROM 16 /* hours */
 #define EVENING_UPTO 1  /* hours, must be >= 0 */
 #define DURATION 20     /* minutes, how long to be light since latest movement */
@@ -35,10 +37,13 @@
 static unsigned int kitchPirS = 15; // wiringpi id; phisical: 8
 static unsigned int kitchRelay = 3; // wiringpi id; phisical: 15
 
-int lastMovingTime = 0; // sec
-bool isLightOn = false;
+int lastOnTime = 0; // sec
 bool prevMoving = false;
+bool prevEveningTime = null;
 unsigned long startedAt = null;
+bool forceOn = false; // treat moving at night/day
+bool forceOff = false; // don't treat moving at evening
+bool isLightOn = false;
 const unsigned HOUR = 24 * 60;  // sec
 const unsigned MIN = 60;        // sec
 
@@ -87,6 +92,11 @@ bool hasMoving(void)
   return digitalRead(kitchPirS);
 }
 
+bool getLightOn(void)
+{
+  return digitalRead(kitchRelay);
+}
+
 time_t seconds()
 {
   return time(NULL);
@@ -94,13 +104,12 @@ time_t seconds()
 
 bool toggleLight(bool isOn)
 {
+  isLightOn = getLightOn();
   if (isLightOn == isOn)
     return isOn;
   fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOn);
-  system("mpg321 ./beep.mp3");
   digitalWrite(kitchRelay, isOn);
-  isLightOn = isOn;
-  return isLightOn;
+  return isLightOn = isOn;
 }
 
 bool getEveningTime()
@@ -114,28 +123,91 @@ bool getEveningTime()
 
   return yes;
 }
+bool getCanBeLight()
+{
+  return forceOn || (getEveningTime() && !forceOff);
+}
+
+bool onExternalOn()
+{
+  fprintf(stderr, "on external: cached: %d / actual: %d\n", isLightOn, getLightOn());
+  print_debug("external on\n");
+  lastOnTime = seconds();	
+  if (getEveningTime() && forceOff) // undo
+  {
+    print_debug("undo force off\n");
+    forceOff = false;
+  }
+  else if (!getEveningTime())
+  {
+    print_debug("force on\n");
+    forceOn = true;
+  }
+
+  return isLightOn = true;
+}
+bool onExternalOff()
+{
+  fprintf(stderr, "on external: cached: %d / actual: %d\n", isLightOn, getLightOn());
+  print_debug("external off\n");
+
+  // выключить до конча периода
+  if (!getEveningTime() && forceOn) // undo
+  {
+    print_debug("undo force on\n");
+    forceOn = false;
+  }
+  else if (getEveningTime())
+  {
+    print_debug("force off\n");
+    forceOff = true;
+  }
+
+  return isLightOn = false;
+}
+
 void onMove(void)
 {
-  lastMovingTime = seconds();
+  lastOnTime = seconds();
+
+  // У нас нет подписки на внешние события включения/выключения
+  // если такое переключение произошло, закешированное тут состояние устарело
+  // нужно его обновить, а за одно возможно выключить автоматику
+  if (isLightOn != getLightOn())
+    isLightOn = getLightOn() ? onExternalOn() : onExternalOff();
+
 
   print_debug("> moving <\n");
-  toggleLight((bool)getEveningTime());
+  if ((bool)getCanBeLight()) toggleLight(true);
 
   if (!getEveningTime())
     print_debug("Not the evening time --> No light\n");
+  if (forceOff)
+    print_debug("Force off --> No light\n");
 }
+
+
 void checkDelay(void)
 {
-  bool shouldBeLight = seconds() - lastMovingTime <= DURATION * MIN;
-  fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastMovingTime);
+  bool shouldBeLight = seconds() - lastOnTime <= DURATION * MIN;
+  fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastOnTime);
   /*
    * don't turn-on by the timer.
    * usecase: light might be turnel off via switch button or api
   */
   if (!shouldBeLight) {
     print_debug("moving timeout --> turn light off\n");
-    toggleLight(getEveningTime() && shouldBeLight);
+    toggleLight(getCanBeLight() && shouldBeLight);
   }
+
+  if ((forceOn || forceOff) && getEveningTime() != prevEveningTime)
+  {
+    print_debug("period changed --> force mode finished");
+    forceOn = false;
+    forceOff = false;
+  }
+
+  prevEveningTime = getEveningTime();
 }
 
 void setupPins()
@@ -150,8 +222,16 @@ void setupPins()
   print_debug("wiringPiISR...\n");
   wiringPiISR(kitchPirS, INT_EDGE_RISING, &onMove); // in
 
-  isLightOn = digitalRead(kitchRelay);
+  isLightOn = getLightOn();
+
   print_debug(isLightOn ? "init: light is on\n" : "init: light is off\n");
+}
+
+void setupExternalSignals()
+{
+  // Хотели получать сигналы включения/выключения из вне, но программа падает от второго подряд сигнала
+  // signal(SIGUSR1, &onExternalOn);
+  // signal(SIGUSR2, &onExternalOff);
 }
 
 /*
@@ -169,14 +249,19 @@ int main(int argc, char *argv[])
 
   setupPins();
 
+  // setupExternalSignals();
+
   //printf (" Int on pin %d: Counter: %5d\n", pin, globalCounter [pin]) ;
   print_debug("waiting...\n");
 
   if (getEveningTime())
-    lastMovingTime = seconds();
+    lastOnTime = seconds();
 
   for (;;)
   {
+    if (isLightOn != getLightOn())
+      getLightOn() ? onExternalOn() : onExternalOff();
+
     // Не начинать проверки сразу после старта
     if (seconds() - startedAt >= DURATION * 60) checkDelay();
 
