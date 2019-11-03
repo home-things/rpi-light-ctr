@@ -128,9 +128,14 @@ void checkDelay(void)
 {
   bool shouldBeLight = seconds() - lastMovingTime <= DURATION * MIN;
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastMovingTime);
-  if (!shouldBeLight)
+  /*
+   * don't turn-on by the timer.
+   * usecase: light might be turnel off via switch button or api
+  */
+  if (!shouldBeLight) {
     print_debug("moving timeout --> turn light off\n");
-  toggleLight(getEveningTime() && shouldBeLight);
+    toggleLight(getEveningTime() && shouldBeLight);
+  }
 }
 
 void setupPins()
