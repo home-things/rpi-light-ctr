@@ -21,6 +21,8 @@ CFLAGS  = -c -std=c99 $(DEBUG) -Wall $(INCLUDE) -Winline -pipe \
   -DDURATION=$(DURATION) \
   -DLIGHT_PIN=$(LIGHT_PIN) \
   -DPIR_S_PIN=$(PIR_S_PIN) \
+  -DDOOR_S_PIN=$(DOOR_S_PIN) \
+  -DFAN_PIN=$(FAN_PIN) \
   -DCORR_TIME=$(CORR_TIME)
 
 LDFLAGS	= -L/usr/local/lib
