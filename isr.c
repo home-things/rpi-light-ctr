@@ -1,5 +1,5 @@
 // compilation & running:
-// sudo make ACTIVE_TIME_LIMIT=0 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
+// sudo make ACTIVE_TIME_LIMIT=0 LIGHT_R_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20
 
 // wiringPi: digitalRead, wiringPiISR, pullUpDnControl, wiringPiSetup
 #include <wiringPi.h>
@@ -23,8 +23,13 @@
 // #include "cJSON/cJSON.h"
 #include "mqtt.h"
 
+#ifndef ACTIVE_TIME_LIMIT
+#define ACTIVE_TIME_LIMIT 0
 #define ACTIVE_FROM (8) /* hours */
 #define ACTIVE_UPTO (24)  /* hours, must be >= 0 */
+#endif
+
+#define CHECK_DELAY 25 /* sec */
 
 #ifndef DURATION      /* might be defined through Makefile */
 #define DURATION (0) /* minutes, how long to be light since latest movement */
@@ -32,10 +37,6 @@
 
 #ifndef CORR_TIME
 #define CORR_TIME 0
-#endif
-
-#ifndef ACTIVE_TIME_LIMIT
-#define ACTIVE_TIME_LIMIT 0
 #endif
 
 #define HOUR (24 * 60) /* sec */
@@ -52,8 +53,11 @@
 #ifndef PIR_S_PIN /* might be defined through Makefile */
 #define PIR_S_PIN (0)
 #define DOOR_S_PIN (0)
-#define LIGHT_PIN (0)
-#define FAN_PIN (0)
+
+#define LIGHT_R_PIN (0)
+#define FAN_R_PIN (0)
+
+#define LIGHT_SW_PIN  (0)
 #endif
 
 int lastMovingTime = null; // sec
@@ -61,7 +65,6 @@ int fanStartedAt = null; // sec
 bool prevMoving = false;
 unsigned long startedAt = null; // sec, since 1970 aka epoch
 unsigned long doorClosedAt = null; 
-bool isOccuped = false;
 bool hasMovAfterDoorClosed = null;
 
 // // get time in seconds
@@ -86,7 +89,7 @@ void date_time_str(char *result_str)
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned int mon = lt->tm_mon, day = lt->tm_mday, hour = lt->tm_hour + CORR_TIME, min = lt->tm_min;
+  const unsigned int mon = lt->tm_mon + 1, day = lt->tm_mday, hour = lt->tm_hour + CORR_TIME, min = lt->tm_min;
   char mon_s[4] = "", day_s[4] = "", hour_s[4] = "", min_s[4] = "";
   int_str(mon, mon_s), int_str(day, day_s), int_str(hour, hour_s), int_str(min, min_s);
   strcat(result_str, mon_s), strcat(result_str, "/"), strcat(result_str, day_s);
@@ -114,23 +117,12 @@ time_t seconds()
 {
   return time(NULL);
 }
-// evening time
-bool getActiveTime()
-{
-  time_t t = time(NULL);
-  struct tm *lt = localtime(&t);
-  const unsigned char hour = lt->tm_hour + CORR_TIME;
-  const bool yes = hour >= ACTIVE_FROM || hour <= ACTIVE_UPTO;
-  print_debug("hour: ");
-  fprintf(stderr, "%d\n", hour); // print_debug
 
-  return yes;
-}
-
-bool toggleLight(bool isOnNext)
+// Переключает свет и вытяжку. isFanOn === !isLightOn
+bool toggleLightFan(bool isOnNext)
 {
   // Кстати вызов нельзя кешировать глобально, т.к. свет может быть переключен снаружи
-  const bool isLightOn = digitalRead(LIGHT_PIN);
+  const bool isLightOn = digitalRead(LIGHT_R_PIN);
   const bool shouldFanOn = !isOnNext;
 
   if (shouldFanOn && !fanStartedAt) fanStartedAt = seconds();
@@ -139,11 +131,11 @@ bool toggleLight(bool isOnNext)
     char date_time[40] = "";
     date_time_str(date_time);
 
-    fprintf(stderr, "%s: effective toggle light. current: %d / request: %d; fan: %d, started: %d, fan pin: %d, val: %d\n", date_time, isLightOn, isOnNext, shouldFanOn, fanStartedAt, FAN_PIN, digitalRead(FAN_PIN));
+    fprintf(stderr, "%s: effective toggle light. current: %d / request: %d ~~ fan: %d, started: %d\n", date_time, isLightOn, isOnNext, shouldFanOn, fanStartedAt);
     // if (!isLightOn) system("mpg321 ./beep.mp3");
 
-    digitalWrite(LIGHT_PIN, isOnNext);
-    digitalWrite(FAN_PIN, shouldFanOn);
+    digitalWrite(LIGHT_R_PIN, isOnNext);
+    digitalWrite(FAN_R_PIN, shouldFanOn);
   }
   return isOnNext;
 }
@@ -151,7 +143,14 @@ bool toggleLight(bool isOnNext)
 bool getLightActiveTime()
 {
 #if ACTIVE_TIME_LIMIT == 1
-  return getActiveTime();
+  time_t t = time(NULL);
+  struct tm *lt = localtime(&t);
+  const unsigned char hour = lt->tm_hour + CORR_TIME;
+  const bool yes = hour >= ACTIVE_FROM || hour <= ACTIVE_UPTO;
+  print_debug("hour: ");
+  fprintf(stderr, "%d\n", hour); // print_debug
+
+  return yes;
 #else
   return true;
 #endif
@@ -159,26 +158,34 @@ bool getLightActiveTime()
 void onMove(void)
 {
   print_debug("> moving <\n");
-  toggleLight((bool)getLightActiveTime());
+  toggleLightFan((bool)getLightActiveTime());
 
   if (!getLightActiveTime())
     print_debug("Not the evening time --> No light\n");
 
   lastMovingTime = seconds();
-  hasMovAfterDoorClosed = true; 
 #if MQTT_CLIENT == 0
   mqtt_send("mov", MQTT_TOPIC);
 #endif
 }
-void onDoorClosed(void)
+void onDoorChanged(void)
 {
-  fprintf(stderr, digitalRead(DOOR_S_PIN) ? "// door opened\n" : "// door closed\n");
-  doorClosedAt = seconds();
-  hasMovAfterDoorClosed = false; 
+  bool isDoorOpen = digitalRead(DOOR_S_PIN);
+  print_debug(isDoorOpen ? "// door opened\n" : "// door closed\n");
+  if (isDoorOpen)
+  {
+    lastMovingTime = seconds();
+    toggleLightFan(true);
+  }
+  else
+  {
+    doorClosedAt = seconds();
+  }
 }
+
 void checkDelay(void)
 {
-  bool isLightOn = digitalRead(LIGHT_PIN);
+  bool isLightOn = digitalRead(LIGHT_R_PIN);
   bool shouldBeLight = seconds() - lastMovingTime <= DURATION * MIN;
   if (!lastMovingTime)
     return;
@@ -187,51 +194,61 @@ void checkDelay(void)
   // LIGHT
   //
 
-  fprintf(stderr, "check: seconds: %ld / diff: %ld, fan started: %d, fan on: %d\n", seconds(), seconds() - lastMovingTime, fanStartedAt, digitalRead(FAN_PIN));
+  if (isLightOn)
+  {
+    fprintf(stderr, "check: diff: %ld, light is on ~~ fan started at: %d, fan on: %d // last_mov-door_closed: %ld\n", seconds() - lastMovingTime, fanStartedAt, digitalRead(FAN_R_PIN), lastMovingTime - doorClosedAt);
+  }
 
   if (!shouldBeLight && isLightOn)
+  {
     print_debug("moving timeout --> turn light off\n");
-
-  toggleLight(getLightActiveTime() && shouldBeLight);
+    toggleLightFan(getLightActiveTime() && shouldBeLight);
+  }
 
   //
   // FAN
   //
 
-  // fanStartedAt определяется после toggleLight
+  // fanStartedAt определяется после toggleLightFan
   bool shouldFanOn = seconds() - fanStartedAt <= DURATION * MIN;
   if (!shouldFanOn && fanStartedAt) {
-          fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld\n", seconds(), fanStartedAt, seconds() - fanStartedAt);
-	  digitalWrite(FAN_PIN, 0);
-	  fanStartedAt = null;
+    fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld\n", seconds(), fanStartedAt, seconds() - fanStartedAt);
+    digitalWrite(FAN_R_PIN, 0);
+    fanStartedAt = null;
   }
 
   //
   // DOOR
   //
 
-  if (!hasMovAfterDoorClosed && seconds() - doorClosedAt >= 1 * MIN)
+  if ((long)lastMovingTime - (long)doorClosedAt <= 5L && isLightOn)
   {
-    fprintf(stderr, "no hasMovAfterDoorClosed && 1 min gone\n");
-    toggleLight(false);
+    if (seconds() - doorClosedAt >= 1 * MIN) {
+      fprintf(stderr, "no hasMovAfterDoorClosed && 1 min gone\n");
+      toggleLightFan(false);
+    } else {
+      fprintf(stderr, "// wait 1min until light off //\n");
+    }
   }
 }
 
 void setupPins()
 {
   //pinMode(PIR_S_PIN, INPUT);
-  //pinMode(LIGHT_PIN, OUTPUT);
+  //pinMode(LIGHT_R_PIN, OUTPUT);
   //pullUpDnControl(PIR_S_PIN, PUD_DOWN); // out
 
   print_debug("wiringPiSetup\n");
   wiringPiSetup();
 
   print_debug("wiringPiISR...\n");
-  wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &onMove); // in
-  wiringPiISR(DOOR_S_PIN, INT_EDGE_FALLING, &onDoorClosed); // in, out
+  wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &onMove); // input mode; on high trigger
+  wiringPiISR(DOOR_S_PIN, INT_EDGE_BOTH, &onDoorChanged); // input mode; on low trigger
 
-  const bool isLightOn = digitalRead(LIGHT_PIN);
-  print_debug(isLightOn ? "init: light is on\n" : "init: light is off\n");
+  const bool isLightOn = false;
+  digitalWrite(LIGHT_R_PIN, isLightOn);
+  digitalWrite(FAN_R_PIN, false);
+  print_debug("light & fan setted up to false\n");
 }
 
 // // @returns epoch secs
@@ -260,7 +277,7 @@ int main(int argc, char *argv[])
   for (;;)
   {
     checkDelay();
-    sleep(15); // seconds
+    sleep(CHECK_DELAY); // seconds
   }
 
   return 0;

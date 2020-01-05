@@ -19,10 +19,11 @@ INCLUDE	= -I/usr/local/include -I.
 CFLAGS  = -c -std=c99 $(DEBUG) -Wall $(INCLUDE) -Winline -pipe \
   -DNO_ACTIVE_TIME_LIMIT=$(NO_ACTIVE_TIME_LIMIT) \
   -DDURATION=$(DURATION) \
-  -DLIGHT_PIN=$(LIGHT_PIN) \
   -DPIR_S_PIN=$(PIR_S_PIN) \
   -DDOOR_S_PIN=$(DOOR_S_PIN) \
-  -DFAN_PIN=$(FAN_PIN) \
+  -DLIGHT_R_PIN=$(LIGHT_R_PIN) \
+  -DFAN_R_PIN=$(FAN_R_PIN) \
+  -DLIGHT_SW=$(LIGHT_SW) \
   -DCORR_TIME=$(CORR_TIME)
 
 LDFLAGS	= -L/usr/local/lib
