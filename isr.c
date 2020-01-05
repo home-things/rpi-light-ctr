@@ -35,9 +35,11 @@
 //static volatile int globalCounter [8] ;
 
 static unsigned int kitchPirS = 15; // wiringpi id; phisical: 8
+static unsigned int kitchSw = 10; // wiringpi id; phisical: 24
 static unsigned int kitchRelay = 3; // wiringpi id; phisical: 15
 
-int lastOnTime = 0; // sec
+unsigned long lastOnTime = 0; // sec; when light turned on recently
+unsigned long lastSwToggle = 0 ; // sec
 bool prevMoving = false;
 bool prevEveningTime = null;
 unsigned long startedAt = null;
@@ -166,16 +168,20 @@ bool onExternalOff()
   return isLightOn = false;
 }
 
+void checkProcessExternalToggle(bool shouldLightOn)
+{
+  // У нас нет подписки на внешние события включения/выключения
+  // если такое переключение произошло, закешированное тут состояние устарело
+  // нужно его обновить, а за одно возможно выключить автоматику
+  if (isLightOn != shouldLightOn)
+    isLightOn = shouldLightOn ? onExternalOn() : onExternalOff();
+}
+
 void onMove(void)
 {
   lastOnTime = seconds();
 
-  // У нас нет подписки на внешние события включения/выключения
-  // если такое переключение произошло, закешированное тут состояние устарело
-  // нужно его обновить, а за одно возможно выключить автоматику
-  if (isLightOn != getLightOn())
-    isLightOn = getLightOn() ? onExternalOn() : onExternalOff();
-
+  checkProcessExternalToggle(getLightOn());
 
   print_debug("> moving <\n");
   if ((bool)getCanBeLight()) toggleLight(true);
@@ -184,6 +190,18 @@ void onMove(void)
     print_debug("Not the evening time --> No light\n");
   if (forceOff)
     print_debug("Force off --> No light\n");
+}
+
+void onSwToggle(void)
+{
+  if (seconds() - lastSwToggle < 1) return;
+
+  fprintf(stderr, "button toggle light. current: %d\n", isLightOn);
+  checkProcessExternalToggle(!isLightOn);
+  toggleLight(!isLightOn);
+  digitalWrite(kitchRelay, !isLightOn);
+
+  lastSwToggle = seconds();
 }
 
 
@@ -221,6 +239,7 @@ void setupPins()
 
   print_debug("wiringPiISR...\n");
   wiringPiISR(kitchPirS, INT_EDGE_RISING, &onMove); // in
+  wiringPiISR(kitchSw, INT_EDGE_BOTH, &onSwToggle); // in
 
   isLightOn = getLightOn();
 

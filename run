@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# todo: fix water.log
+# todo: fix log
 
 dir=$(dirname $0)
 cd $dir
-tail -n1 water.log | xargs ./isr >> water.log  2> >(while read line; do echo -e "\e[01;33m$line\e[0m" >&2; done)
+tail -n1 log | xargs ./isr >> log  2> >(while read line; do echo -e "\e[01;33m$line\e[0m" >&2; done)
