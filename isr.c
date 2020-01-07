@@ -39,13 +39,16 @@ static unsigned int kitchSw = 10; // wiringpi id; phisical: 24
 static unsigned int kitchRelay = 3; // wiringpi id; phisical: 15
 
 unsigned long lastOnTime = 0; // sec; when light turned on recently
-unsigned long lastSwToggle = 0 ; // sec
+unsigned long lastSwToggleMs = 0 ; // millisec
+unsigned long startedAt = null;
+
 bool prevMoving = false;
 bool prevEveningTime = null;
-unsigned long startedAt = null;
 bool forceOn = false; // treat moving at night/day
 bool forceOff = false; // don't treat moving at evening
 bool isLightOn = false;
+bool isExternalToggleProcessing = false;
+
 const unsigned HOUR = 24 * 60;  // sec
 const unsigned MIN = 60;        // sec
 
@@ -106,8 +109,7 @@ time_t seconds()
 
 bool toggleLight(bool isOn)
 {
-  isLightOn = getLightOn();
-  if (isLightOn == isOn)
+  if (getLightOn() == isOn)
     return isOn;
   fprintf(stderr, "effective toggle light. current: %d / request: %d\n", isLightOn, isOn);
   digitalWrite(kitchRelay, isOn);
@@ -118,10 +120,10 @@ bool getEveningTime()
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned char hour = lt->tm_hour + 3;
+  const unsigned char hour = lt->tm_hour + 3 >= 24 ? lt->tm_hour + 3 - 24 : lt->tm_hour + 3;
   const bool yes = hour >= EVENING_FROM || hour <= EVENING_UPTO;
-  print_debug("hour: ");
-  fprintf(stderr, "%d\n", hour); // print_debug
+  // print_debug("hour: ");
+  // fprintf(stderr, "%d\n", hour); // print_debug
 
   return yes;
 }
@@ -132,8 +134,16 @@ bool getCanBeLight()
 
 bool onExternalOn()
 {
+  if (isExternalToggleProcessing)
+  {
+    print_debug("skip onExternalOn\n");
+    return isLightOn;
+  }
+  isExternalToggleProcessing = true;
+
   fprintf(stderr, "on external: cached: %d / actual: %d\n", isLightOn, getLightOn());
   print_debug("external on\n");
+
   lastOnTime = seconds();	
   if (getEveningTime() && forceOff) // undo
   {
@@ -146,10 +156,18 @@ bool onExternalOn()
     forceOn = true;
   }
 
-  return isLightOn = true;
+  isExternalToggleProcessing = false;
+  return true;
 }
 bool onExternalOff()
 {
+  if (isExternalToggleProcessing)
+  {
+    print_debug("skip onExternalOff\n");
+    return isLightOn;
+  }
+  isExternalToggleProcessing = true;
+
   fprintf(stderr, "on external: cached: %d / actual: %d\n", isLightOn, getLightOn());
   print_debug("external off\n");
 
@@ -165,7 +183,8 @@ bool onExternalOff()
     forceOff = true;
   }
 
-  return isLightOn = false;
+  isExternalToggleProcessing = false;
+  return false;
 }
 
 void checkProcessExternalToggle(bool shouldLightOn)
@@ -181,7 +200,10 @@ void onMove(void)
 {
   lastOnTime = seconds();
 
-  checkProcessExternalToggle(getLightOn());
+  bool shouldLightOn = getLightOn();
+  checkProcessExternalToggle(shouldLightOn);
+  if (isLightOn != shouldLightOn)
+    fprintf(stderr, "after external-extarnal (move) processed: isLightOn: %d\n", isLightOn);
 
   print_debug("> moving <\n");
   if ((bool)getCanBeLight()) toggleLight(true);
@@ -194,14 +216,18 @@ void onMove(void)
 
 void onSwToggle(void)
 {
-  if (seconds() - lastSwToggle < 1) return;
+  if (millis() - lastSwToggleMs < 233)
+  {
+     print_debug("debounce: skip sw toggle\n");
+     return;
+  }
 
   fprintf(stderr, "button toggle light. current: %d\n", isLightOn);
   checkProcessExternalToggle(!isLightOn);
-  toggleLight(!isLightOn);
-  digitalWrite(kitchRelay, !isLightOn);
+  fprintf(stderr, "after external (button) processed: isLightOn: %d\n", isLightOn);
+  digitalWrite(kitchRelay, isLightOn);
 
-  lastSwToggle = seconds();
+  lastSwToggleMs = millis();
 }
 
 
@@ -278,13 +304,21 @@ int main(int argc, char *argv[])
 
   for (;;)
   {
-    if (isLightOn != getLightOn())
+    // У нас нет подписки на внешние события включения/выключения
+    // если такое переключение произошло, закешированное тут состояние устарело
+    // нужно его обновить, а за одно возможно выключить автоматику
+    if (isLightOn != getLightOn() && seconds() - startedAt >= 30)
+    {
       getLightOn() ? onExternalOn() : onExternalOff();
+      fprintf(stderr, "after external-external (cycle) processed: isLightOn: %d\n", isLightOn);
+    }
 
     // Не начинать проверки сразу после старта
-    if (seconds() - startedAt >= DURATION * 60) checkDelay();
+    if (seconds() - startedAt >= DURATION * MIN) checkDelay();
 
-    sleep(15); // seconds
+    fprintf(stderr, "debug: cached: %d, actual: %d, forceOn: %d, forceOff: %d\n", isLightOn, digitalRead(kitchRelay), forceOn, forceOff);
+
+    sleep(30); // seconds
   }
 
   return 0;
