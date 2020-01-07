@@ -25,7 +25,7 @@
 
 #ifndef ACTIVE_TIME_LIMIT
 #define ACTIVE_TIME_LIMIT 0
-#define ACTIVE_FROM (8) /* hours */
+#define ACTIVE_FROM (10) /* hours */
 #define ACTIVE_UPTO (1)  /* hours, must be >= 0 */
 #endif
 
