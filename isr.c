@@ -62,6 +62,7 @@
 #endif
 
 int lastMovingTime = null; // sec
+unsigned long lastSwToggleMs = 0 ; // millisec
 int fanStartedAt = null; // sec
 bool prevMoving = false;
 unsigned long startedAt = null; // sec, since 1970 aka epoch
@@ -90,7 +91,8 @@ void date_time_str(char *result_str)
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned int mon = lt->tm_mon + 1, day = lt->tm_mday, hour = lt->tm_hour + CORR_TIME, min = lt->tm_min;
+  unsigned char h = lt->tm_hour + CORR_TIME;
+  const unsigned int mon = lt->tm_mon + 1, day = lt->tm_mday, hour = h >= 24 ? h - 24 : h, min = lt->tm_min;
   char mon_s[4] = "", day_s[4] = "", hour_s[4] = "", min_s[4] = "";
   int_str(mon, mon_s), int_str(day, day_s), int_str(hour, hour_s), int_str(min, min_s);
   strcat(result_str, mon_s), strcat(result_str, "/"), strcat(result_str, day_s);
@@ -173,6 +175,30 @@ void onMove(void)
   mqtt_send("mov", MQTT_TOPIC);
 #endif
 }
+
+void onSwToggle(void)
+{
+  if (millis() - lastSwToggleMs < 233)
+  {
+     print_debug("debounce: skip sw toggle\n");
+     return;
+  }
+  lastSwToggleMs = millis();
+
+  fprintf(stderr, "button toggle light. current: night_l: %d main_l: %d\n", digitalRead(NIGHT_LIGHT_R_PIN), digitalRead(MAIN_LIGHT_R_PIN));
+
+  if (checkMainLightTime())
+    print_debug("main light time now --> button has no action");
+  else if (!digitalRead(DOOR_S_PIN))
+    print_debug("door is closed --> button has no action");
+  else
+  {
+    bool isMainLightOn = digitalRead(MAIN_LIGHT_R_PIN);
+    digitalWrite(MAIN_LIGHT_R_PIN, !isMainLightOn);
+    digitalWrite(NIGHT_LIGHT_R_PIN, isMainLightOn);
+  }
+}
+
 void onDoorChanged(void)
 {
   bool isDoorOpen = digitalRead(DOOR_S_PIN);
@@ -245,6 +271,7 @@ void setupPins()
   print_debug("wiringPiISR...\n");
   wiringPiISR(PIR_S_PIN, INT_EDGE_RISING, &onMove); // input mode; on high trigger
   wiringPiISR(DOOR_S_PIN, INT_EDGE_BOTH, &onDoorChanged); // input mode; on low trigger
+  wiringPiISR(LIGHT_SW_PIN, INT_EDGE_BOTH, &onSwToggle);
 
   const bool isLightOn = false;
   digitalWrite(NIGHT_LIGHT_R_PIN, isLightOn);
