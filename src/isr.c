@@ -79,7 +79,8 @@ void date_time_str(char *result_str)
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned int mon = lt->tm_mon, day = lt->tm_mday, hour = lt->tm_hour + CORR_TIME, min = lt->tm_min;
+  unsigned char h = lt->tm_hour + CORR_TIME;
+  const unsigned int mon = lt->tm_mon, day = lt->tm_mday, hour = h >= 24 ? h - 24 : h, min = lt->tm_min;
   char mon_s[4] = "", day_s[4] = "", hour_s[4] = "", min_s[4] = "";
   int_str(mon, mon_s), int_str(day, day_s), int_str(hour, hour_s), int_str(min, min_s);
   strcat(result_str, mon_s), strcat(result_str, "/"), strcat(result_str, day_s);
@@ -131,12 +132,10 @@ bool get_active_time()
 #if ACTIVE_TIME_LIMIT == 1
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned char hour = lt->tm_hour + CORR_TIME;
-  const bool yes = hour >= EVENING_FROM || hour <= EVENING_UPTO;
-  print_debug("hour: ");
-  fprintf(stderr, "%d\n", hour); // print_debug
+  unsigned char h = lt->tm_hour + CORR_TIME;
+  unsigned char hour = h >= 24 ? h - 24 : h;
 
-  return yes;
+  return hour >= EVENING_FROM || hour <= EVENING_UPTO;
 #else
   return true;
 #endif
