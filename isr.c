@@ -25,9 +25,13 @@
 
 #ifndef ACTIVE_TIME_LIMIT
 #define ACTIVE_TIME_LIMIT 0
-#define ACTIVE_FROM (10) /* hours */
-#define ACTIVE_UPTO (1)  /* hours, must be >= 0 */
 #endif
+
+#define ACTIVE_SINCE (10) /* hours */
+#define SILENT_SINCE (23)  /* hours, must be >= 0 */
+#define ACTIVE_UPTO (1)  /* hours, must be >= 0 */
+
+#define SILENT_FAN_DELAY (5) /* min */
 
 #define CHECK_DELAY 25 /* sec */
 
@@ -118,15 +122,19 @@ time_t seconds()
 {
   return time(NULL);
 }
-
-bool checkMainLightTime()
+unsigned char getHour()
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
   unsigned char h = lt->tm_hour + CORR_TIME;
-  unsigned char hour = h >= 24 ? h - 24 : h;
 
-  return hour >= ACTIVE_FROM || hour < ACTIVE_UPTO;
+  return h >= 24 ? h - 24 : h;
+}
+
+bool checkMainLightTime()
+{
+  unsigned char hour = getHour();
+  return hour >= ACTIVE_SINCE || hour < ACTIVE_UPTO;
 }
 
 bool checkAnyLightOn(void)
@@ -215,7 +223,9 @@ void checkDelay(void)
   //
 
   // fanStartedAt определяется после toggleLightFan
-  bool shouldFanOn = seconds() - fanStartedAt <= DURATION * MIN;
+  unsigned char hour = getHour();
+  bool fanDuration = (hour >= SILENT_SINCE || hour < ACTIVE_SINCE ? SILENT_FAN_DELAY : DURATION) * MIN;
+  bool shouldFanOn = seconds() - fanStartedAt <= fanDuration;
   if (!shouldFanOn && fanStartedAt) {
     fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld\n", seconds(), fanStartedAt, seconds() - fanStartedAt);
     digitalWrite(FAN_R_PIN, 0);
