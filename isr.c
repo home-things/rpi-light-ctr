@@ -24,9 +24,11 @@
 
 // #include "signal.h" -- пытались получать через SIGUSR сингалы с homekit
 
-#define EVENING_FROM 16 /* hours */
-#define EVENING_UPTO 1  /* hours, must be >= 0 */
+#define ACTIVE_SINCE 16 /* hours */
+#define ACTIVE_UPTO 1  /* hours, must be >= 0 */
 #define DURATION 20     /* minutes, how long to be light since latest movement */
+#define NIGHTY_SINCE 23
+#define NIGHTY_DURATION 5
 
 // globalCounter:
 //	Global variable to count interrupts
@@ -69,12 +71,20 @@ void int_str(int i, char *s)
 {
   sprintf(s, "%d", i);
 }
+unsigned getHour ()
+{
+  time_t t = time(NULL);
+  struct tm *lt = localtime(&t);
+
+  return lt->tm_hour + 3 >= 24 ? lt->tm_hour + 3 - 24 : lt->tm_hour + 3;
+}
 
 void date_time_str(char *result_str)
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned int hour = lt->tm_hour + 3, min = lt->tm_min;
+  const unsigned int hour = getHour();
+  const unsigned int min = lt->tm_min;
   char hour_s[10] = "", min_s[10] = "";
   int_str(hour, hour_s), int_str(min, min_s);
   strcat(result_str, hour_s), strcat(result_str, ":"), strcat(result_str, min_s);
@@ -118,10 +128,8 @@ bool toggleLight(bool isOn)
 
 bool getEveningTime()
 {
-  time_t t = time(NULL);
-  struct tm *lt = localtime(&t);
-  const unsigned char hour = lt->tm_hour + 3 >= 24 ? lt->tm_hour + 3 - 24 : lt->tm_hour + 3;
-  const bool yes = hour >= EVENING_FROM || hour <= EVENING_UPTO;
+  const unsigned hour = getHour();
+  const bool yes = hour >= ACTIVE_SINCE || hour <= ACTIVE_UPTO;
   // print_debug("hour: ");
   // fprintf(stderr, "%d\n", hour); // print_debug
 
@@ -233,7 +241,9 @@ void onSwToggle(void)
 
 void checkDelay(void)
 {
-  bool shouldBeLight = seconds() - lastOnTime <= DURATION * MIN;
+  const unsigned hour = getHour();
+  const unsigned duration = hour >= NIGHTY_SINCE || hour < ACTIVE_SINCE ? NIGHTY_DURATION : DURATION;
+  const bool shouldBeLight = seconds() - lastOnTime <= duration * MIN;
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastOnTime);
   /*
    * don't turn-on by the timer.
