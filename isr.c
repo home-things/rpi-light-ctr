@@ -24,7 +24,7 @@
 
 // #include "signal.h" -- пытались получать через SIGUSR сингалы с homekit
 
-#define ACTIVE_SINCE 16 /* hours */
+#define ACTIVE_SINCE 19 /* hours */
 #define ACTIVE_UPTO 1  /* hours, must be >= 0 */
 #define DURATION 20     /* minutes, how long to be light since latest movement */
 #define NIGHTY_SINCE 23
