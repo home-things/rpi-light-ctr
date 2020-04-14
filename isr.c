@@ -21,17 +21,18 @@
 // #include "debounce.h"
 // #include "rest.h"
 // #include "cJSON/cJSON.h"
-#include "mqtt.h"
+
+// #include "mqtt.h"
 
 #ifndef ACTIVE_TIME_LIMIT
 #define ACTIVE_TIME_LIMIT 0
 #endif
 
-#define ACTIVE_SINCE (10) /* hours */
+#define ACTIVE_SINCE (8) /* hours */
 #define SILENT_SINCE (23)  /* hours, must be >= 0 */
-#define ACTIVE_UPTO (1)  /* hours, must be >= 0 */
+#define ACTIVE_UPTO (24)  /* hours, must be >= 0 */
 
-#define SILENT_FAN_DELAY (5) /* min */
+#define SILENT_FAN_DURATION (3) /* min */
 
 #define CHECK_DELAY 25 /* sec */
 
@@ -67,8 +68,8 @@
 
 int lastMovingTime = null; // sec
 int fanStartedAt = null; // sec
-bool prevMoving = false;
 unsigned long startedAt = null; // sec, since 1970 aka epoch
+unsigned long startMovingAt = null; 
 unsigned long doorClosedAt = null; 
 bool hasMovAfterDoorClosed = null;
 
@@ -177,8 +178,9 @@ void onMove(void)
   toggleLightFan(true);
 
   lastMovingTime = seconds();
+  if (!checkAnyLightOn()) startMovingAt = seconds();
 #if MQTT_CLIENT == 0
-  mqtt_send("mov", MQTT_TOPIC);
+  // mqtt_send("mov", MQTT_TOPIC);
 #endif
 }
 void onDoorChanged(void)
@@ -188,6 +190,7 @@ void onDoorChanged(void)
   if (isDoorOpen)
   {
     lastMovingTime = seconds();
+    startMovingAt = seconds();
     toggleLightFan(true);
   }
   else
@@ -224,10 +227,12 @@ void checkDelay(void)
 
   // fanStartedAt определяется после toggleLightFan
   unsigned char hour = getHour();
-  bool fanDuration = (hour >= SILENT_SINCE || hour < ACTIVE_SINCE ? SILENT_FAN_DELAY : DURATION) * MIN;
+  bool isSilentHour = hour >= SILENT_SINCE || hour < ACTIVE_SINCE;
+  bool isLastMovingTooShort = (lastMovingTime - startMovingAt) <= 1 * MIN;
+  unsigned fanDuration = (isSilentHour || isLastMovingTooShort ? SILENT_FAN_DURATION : DURATION) * MIN;
   bool shouldFanOn = seconds() - fanStartedAt <= fanDuration;
   if (!shouldFanOn && fanStartedAt) {
-    fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld\n", seconds(), fanStartedAt, seconds() - fanStartedAt);
+    fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld, duration: %ldsec, silent: %d, movShort: %d, duration: %dmin, silent (real): %d, last moving duration: %ldsec, 1min: %d\n", seconds(), fanStartedAt, seconds() - fanStartedAt, fanDuration, isSilentHour, isLastMovingTooShort, isSilentHour || isLastMovingTooShort ? SILENT_FAN_DURATION : DURATION, hour >= SILENT_SINCE || hour < ACTIVE_SINCE, lastMovingTime - startMovingAt, MIN);
     digitalWrite(FAN_R_PIN, 0);
     fanStartedAt = null;
   }
@@ -281,7 +286,7 @@ int main(int argc, char *argv[])
 
   setupPins();
 
-  mqtt_setup(MQTT_BROKER_HOST);
+  // mqtt_setup(MQTT_BROKER_HOST);
 
   print_debug("waiting...\n");
 
