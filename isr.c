@@ -24,11 +24,13 @@
 
 // #include "signal.h" -- пытались получать через SIGUSR сингалы с homekit
 
-#define ACTIVE_SINCE 19 /* hours */
+int SUNSET_HOURS[] = {16, 17, 18, 19, 20, 21, 21, 20, 19, 18, 17, 16}; // by the monts
+
+//define ACTIVE_SINCE; /* hours */ -- use get_sunset_hour instead
 #define ACTIVE_UPTO 1  /* hours, must be >= 0 */
 #define DURATION 20     /* minutes, how long to be light since latest movement */
-#define NIGHTY_SINCE 23
-#define NIGHTY_DURATION 5
+#define NIGHTY_DURATION 4
+#define DAYTIME_DURATION 8
 
 // globalCounter:
 //	Global variable to count interrupts
@@ -71,7 +73,16 @@ void int_str(int i, char *s)
 {
   sprintf(s, "%d", i);
 }
-unsigned getHour ()
+
+int get_sunset_hour()
+{
+  time_t t = time(NULL);
+  struct tm *lt = localtime(&t);
+  int month = lt->tm_mon; // 0..11
+  return SUNSET_HOURS[month];
+}
+
+unsigned get_hour()
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
@@ -83,7 +94,7 @@ void date_time_str(char *result_str)
 {
   time_t t = time(NULL);
   struct tm *lt = localtime(&t);
-  const unsigned int hour = getHour();
+  const unsigned int hour = get_hour();
   const unsigned int min = lt->tm_min;
   char hour_s[10] = "", min_s[10] = "";
   int_str(hour, hour_s), int_str(min, min_s);
@@ -128,8 +139,8 @@ bool toggleLight(bool isOn)
 
 bool getEveningTime()
 {
-  const unsigned hour = getHour();
-  const bool yes = hour >= ACTIVE_SINCE || hour <= ACTIVE_UPTO;
+  const unsigned hour = get_hour();
+  const bool yes = hour >= get_sunset_hour() || hour <= ACTIVE_UPTO;
   // print_debug("hour: ");
   // fprintf(stderr, "%d\n", hour); // print_debug
 
@@ -209,17 +220,20 @@ void onMove(void)
   lastOnTime = seconds();
 
   bool shouldLightOn = getLightOn();
+  // проверяем, не переключили ли недавно свет из вне
   checkProcessExternalToggle(shouldLightOn);
   if (isLightOn != shouldLightOn)
-    fprintf(stderr, "after external-extarnal (move) processed: isLightOn: %d\n", isLightOn);
+    fprintf(stderr, "(move) after external-external processed: isLightOn: %d\n", isLightOn);
 
   print_debug("> moving <\n");
   if ((bool)getCanBeLight()) toggleLight(true);
 
+  if (forceOn)
+    print_debug("Light forced on\n");
   if (!getEveningTime())
-    print_debug("Not the evening time --> No light\n");
+    print_debug("Not the evening time --> Should no light\n");
   if (forceOff)
-    print_debug("Force off --> No light\n");
+    print_debug("Force off --> Should no light\n");
 }
 
 void onSwToggle(void)
@@ -232,22 +246,30 @@ void onSwToggle(void)
 
   fprintf(stderr, "button toggle light. current: %d\n", isLightOn);
   checkProcessExternalToggle(!isLightOn);
-  fprintf(stderr, "after external (button) processed: isLightOn: %d\n", isLightOn);
+  fprintf(stderr, "(button) after external processed: isLightOn: %d\n", isLightOn);
   digitalWrite(kitchRelay, isLightOn);
 
   lastSwToggleMs = millis();
 }
 
-
-void checkDelay(void)
+unsigned get_duration(unsigned hour)
 {
-  const unsigned hour = getHour();
-  const unsigned duration = hour >= NIGHTY_SINCE || hour < ACTIVE_SINCE ? NIGHTY_DURATION : DURATION;
+  // when user forced light on
+  if (hour >= get_sunset_hour() + 2) return NIGHTY_DURATION;
+  if (hour < get_sunset_hour()) return DAYTIME_DURATION;
+  // usual evening routine
+  return DURATION;
+}
+
+void check_delay()
+{
+  const unsigned hour = get_hour();
+  const unsigned duration = get_duration(hour);
   const bool shouldBeLight = seconds() - lastOnTime <= duration * MIN;
   fprintf(stderr, "check: seconds: %ld / diff: %ld\n", seconds(), seconds() - lastOnTime);
   /*
    * don't turn-on by the timer.
-   * usecase: light might be turnel off via switch button or api
+   * usecase: light might be turned off via switch button or api
   */
   if (!shouldBeLight) {
     print_debug("moving timeout --> turn light off\n");
@@ -319,12 +341,14 @@ int main(int argc, char *argv[])
     // нужно его обновить, а за одно возможно выключить автоматику
     if (isLightOn != getLightOn() && seconds() - startedAt >= 30)
     {
-      getLightOn() ? onExternalOn() : onExternalOff();
-      fprintf(stderr, "after external-external (cycle) processed: isLightOn: %d\n", isLightOn);
+      isLightOn = getLightOn() ? onExternalOn() : onExternalOff();
+      fprintf(stderr, "(cycle) after external-external processed: isLightOn: %d\n", isLightOn);
     }
 
     // Не начинать проверки сразу после старта
-    if (seconds() - startedAt >= DURATION * MIN) checkDelay();
+    const unsigned hour = get_hour();
+    const unsigned duration = get_duration(hour);
+    if (seconds() - startedAt >= duration * MIN) check_delay();
 
     fprintf(stderr, "debug: cached: %d, actual: %d, forceOn: %d, forceOff: %d\n", isLightOn, digitalRead(kitchRelay), forceOn, forceOff);
 
