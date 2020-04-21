@@ -30,7 +30,7 @@
 
 #define ACTIVE_SINCE (8) /* hours */
 #define SILENT_SINCE (23)  /* hours, must be >= 0 */
-#define ACTIVE_UPTO (24)  /* hours, must be >= 0 */
+#define ACTIVE_UPTO (0)  /* hours, must be >= 0 */
 
 #define SILENT_FAN_DURATION (3) /* min */
 
@@ -135,7 +135,12 @@ unsigned char getHour()
 bool checkMainLightTime()
 {
   unsigned char hour = getHour();
-  return hour >= ACTIVE_SINCE || hour < ACTIVE_UPTO;
+  unsigned char upto = ACTIVE_UPTO == 0 ? 24 : ACTIVE_UPTO;
+
+  bool upto_pm = upto > ACTIVE_SINCE;
+  return upto_pm
+    ? (hour >= ACTIVE_SINCE && hour < upto)
+    : (hour >= ACTIVE_SINCE || hour < upto);
 }
 
 bool checkAnyLightOn(void)
