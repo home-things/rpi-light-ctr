@@ -148,10 +148,41 @@ bool checkAnyLightOn(void)
   return digitalRead(NIGHT_LIGHT_R_PIN) || digitalRead(MAIN_LIGHT_R_PIN);
 }
 
+#define STEPS 1024
+
+int map_step(int i, int from, int to, int steps) {
+  int val_steps = abs(from - to);
+  float progress = (to > from ? 1.0 : -1.0) * i / steps;
+  return from + roundf(progress * val_steps);
+}
+
+void dimm_up(int pin)
+{
+  delay(500);
+  digitalWrite(pin, LOW);
+  pinMode(pin, PWM_OUTPUT);
+  pwmWrite(pin, 0);
+  //delay (1);   // delay a moment to let hardware settings settle.
+  //pwmWrite(pin, 0);
+
+  for (int i = 0; i <= STEPS; i+=2) {
+    pwmWrite(pin, i);
+    int ms = map_step(i, 16, 0, STEPS);
+    delay(ms);
+  }
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, HIGH);
+}
+
 void toggleAnyLight(bool shouldBeOn)
 {
   digitalWrite(MAIN_LIGHT_R_PIN, checkMainLightTime() && shouldBeOn);
-  digitalWrite(NIGHT_LIGHT_R_PIN, !checkMainLightTime() && shouldBeOn);
+  if (!checkMainLightTime()) {
+    if (shouldBeOn)
+      dimm_up(NIGHT_LIGHT_R_PIN);
+    else
+      digitalWrite(NIGHT_LIGHT_R_PIN, false);
+  }
 }
 
 
