@@ -177,12 +177,13 @@ void dimm_up(int pin)
 void toggleAnyLight(bool shouldBeOn)
 {
   digitalWrite(MAIN_LIGHT_R_PIN, checkMainLightTime() && shouldBeOn);
-  if (!checkMainLightTime()) {
-    if (shouldBeOn)
-      dimm_up(NIGHT_LIGHT_R_PIN);
-    else
-      digitalWrite(NIGHT_LIGHT_R_PIN, false);
-  }
+  digitalWrite(NIGHT_LIGHT_R_PIN, !checkMainLightTime() && shouldBeOn);
+  //if (!checkMainLightTime()) {
+  //  if (shouldBeOn)
+  //    dimm_up(NIGHT_LIGHT_R_PIN);
+  //  else
+  //    digitalWrite(NIGHT_LIGHT_R_PIN, false);
+  //}
 }
 
 
