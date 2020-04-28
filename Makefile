@@ -23,6 +23,7 @@ LDLIBS  = -lpthread -lm -lwiringPi -lwiringPiDev # -lssl -lrt (realtime) -lcrypt
 # Should not alter anything below this line
 ###############################################################################
 
+DEPS := cJSON/cJSON.h
 SRC  := $(wildcard *.c)
 OBJS := $(SRC:.c=.o)
 BINS :=	$(SRC:.c=)
@@ -42,9 +43,13 @@ install:
 run:	isr
 	./run
 
-isr:	$(OBJS)
+isr:	$(DEPS) $(OBJS)
 	@echo [link] $^ '-->' $@
 	$(CC) $(OBJS) $(LDFLAGS) $(LDLIBS) -o $@
+
+cJSON/cJSON.h:
+	git submodule init
+	git submodule update
 
 %.o:    %.c
 	@echo [CC] $< '-->' $@
