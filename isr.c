@@ -32,7 +32,8 @@
 #define SILENT_SINCE (23)  /* hours, must be >= 0 */
 #define ACTIVE_UPTO (0)  /* hours, must be >= 0 */
 
-#define SILENT_FAN_DURATION (3) /* min */
+#define SHORT_FAN_DURATION (3) /* min */
+#define LONG_FAN_DURATION (30) /* min */
 
 #define CHECK_DELAY 25 /* sec */
 
@@ -66,8 +67,11 @@
 #define LIGHT_SW_PIN  (0)
 #endif
 
-int lastMovingTime = null; // sec
-int fanStartedAt = null; // sec
+#define HIGH_HUMIDITY (70)
+
+unsigned long lastMovingTime = null; // sec
+unsigned long fanStartedAt = null; // sec
+unsigned long highHumiditySince = null; // sec
 unsigned long startedAt = null; // sec, since 1970 aka epoch
 unsigned long startMovingAt = null; 
 unsigned long doorClosedAt = null; 
@@ -112,6 +116,16 @@ void print_debug(const char *str)
   strcat(buf, ": ");
   strcat(buf, str);
   fprintf(stderr, buf);
+}
+
+float get_humidity()
+{
+  float humidity;
+  FILE *fp = popen("/home/pi/services/humidity/get-humidity", "r");
+
+  fscanf(fp, "%f", &humidity);
+  pclose(fp);
+  return humidity;
 }
 
 bool hasMoving(void)
@@ -212,14 +226,17 @@ bool toggleLightFan(bool isOnNext)
 void onMove(void)
 {
   print_debug("> moving <\n");
+
+  if (!checkAnyLightOn()) startMovingAt = seconds();
+  lastMovingTime = seconds();
+
   toggleLightFan(true);
 
-  lastMovingTime = seconds();
-  if (!checkAnyLightOn()) startMovingAt = seconds();
 #if MQTT_CLIENT == 0
   // mqtt_send("mov", MQTT_TOPIC);
 #endif
 }
+
 void onDoorChanged(void)
 {
   bool isDoorOpen = digitalRead(DOOR_S_PIN);
@@ -234,6 +251,19 @@ void onDoorChanged(void)
   {
     doorClosedAt = seconds();
   }
+}
+
+unsigned get_fan_duration()
+{
+  unsigned char hour = getHour();
+  bool isSilentHour = hour >= SILENT_SINCE || hour < ACTIVE_SINCE;
+  bool isLastMovingTooShort = (lastMovingTime - startMovingAt) <= 1 * MIN;
+
+  if (isSilentHour) return SHORT_FAN_DURATION;
+  if (highHumiditySince) return LONG_FAN_DURATION;
+  if (isLastMovingTooShort) return SHORT_FAN_DURATION;
+
+  return DURATION;
 }
 
 void checkDelay(void)
@@ -266,10 +296,10 @@ void checkDelay(void)
   unsigned char hour = getHour();
   bool isSilentHour = hour >= SILENT_SINCE || hour < ACTIVE_SINCE;
   bool isLastMovingTooShort = (lastMovingTime - startMovingAt) <= 1 * MIN;
-  unsigned fanDuration = (isSilentHour || isLastMovingTooShort ? SILENT_FAN_DURATION : DURATION) * MIN;
+  unsigned fanDuration = get_fan_duration() * MIN;
   bool shouldFanOn = seconds() - fanStartedAt <= fanDuration;
   if (!shouldFanOn && fanStartedAt) {
-    fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld, duration: %ldsec, silent: %d, movShort: %d, duration: %dmin, silent (real): %d, last moving duration: %ldsec, 1min: %d\n", seconds(), fanStartedAt, seconds() - fanStartedAt, fanDuration, isSilentHour, isLastMovingTooShort, isSilentHour || isLastMovingTooShort ? SILENT_FAN_DURATION : DURATION, hour >= SILENT_SINCE || hour < ACTIVE_SINCE, lastMovingTime - startMovingAt, MIN);
+    fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld, duration: %ldsec, silent: %d, movShort: %d, duration: %dmin, silent (real): %d, last moving duration: %ldsec, 1min: %d\n", seconds(), fanStartedAt, seconds() - fanStartedAt, fanDuration, isSilentHour, isLastMovingTooShort, isSilentHour || isLastMovingTooShort ? SHORT_FAN_DURATION : DURATION, hour >= SILENT_SINCE || hour < ACTIVE_SINCE, lastMovingTime - startMovingAt, MIN);
     digitalWrite(FAN_R_PIN, 0);
     fanStartedAt = null;
   }
@@ -332,6 +362,14 @@ int main(int argc, char *argv[])
   {
     checkDelay();
     sleep(CHECK_DELAY); // seconds
+    if (highHumiditySince == null) {
+      float humidity = get_humidity();
+      if (humidity >= HIGH_HUMIDITY) {
+        highHumiditySince = seconds();
+      }
+    } else if (seconds() - highHumiditySince > 40 * MIN) {
+      highHumiditySince = null;
+    }
   }
 
   return 0;
