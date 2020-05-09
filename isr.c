@@ -69,13 +69,16 @@
 
 #define HIGH_HUMIDITY (70)
 
+#define ALLOWED_MOV_DOOR_CLSD_TIME (3) /* sec */
+#define NO_MOV_DOOR_CLSD_TIME (30) /* sec */
+#define HIGHHUM_NO_MOV_DOOR_CLSD_TIME (8) /* sec */
+
 unsigned long lastMovingTime = null; // sec
 unsigned long fanStartedAt = null; // sec
 unsigned long highHumiditySince = null; // sec
 unsigned long startedAt = null; // sec, since 1970 aka epoch
 unsigned long startMovingAt = null; 
-unsigned long doorClosedAt = null; 
-bool hasMovAfterDoorClosed = null;
+unsigned long doorClosedAt = null; // sec
 
 // // get time in seconds
 // unsigned getSunset()
@@ -266,7 +269,7 @@ unsigned get_fan_duration()
   return DURATION;
 }
 
-void checkDelay(void)
+void check_delay(void)
 {
   bool isLightOn = checkAnyLightOn();
   bool shouldBeLight = seconds() - lastMovingTime <= DURATION * MIN;
@@ -308,10 +311,19 @@ void checkDelay(void)
   // DOOR
   //
 
-  if ((long)lastMovingTime - (long)doorClosedAt <= 5L && isLightOn)
+  // В момент закрытия двери есть небольшой разрешённый промежуток срабатыванию датчика движения, после которого идёт ожидается ещё около минуты и свет выключается. 
+  //
+  // Так нужно потому что 
+  // 1. в момент закрытия может быть движение, 
+  // 2. а ещё может выйти один человек, но остаться внутри другой (например за утренней чисткой зубов =)
+  // см схему: https://www.notion.so/thsm/pir-b01f448c3fbb417480e4f0f3a5adcfff 
+  if (lastMovingTime - doorClosedAt <= ALLOWED_MOV_DOOR_CLSD_TIME && isLightOn)
   {
-    if (seconds() - doorClosedAt >= 1 * MIN) {
-      fprintf(stderr, "no hasMovAfterDoorClosed && 1 min gone\n");
+    const awaitTime = highHumiditySince
+      ? HIGHHUM_NO_MOV_DOOR_CLSD_TIME
+      : NO_MOV_DOOR_CLSD_TIME;
+    if (seconds() - doorClosedAt >= awaitTime) {
+      fprintf(stderr, "hasn't motion after door closed && 1 min gone\n");
       toggleLightFan(false);
     } else {
       fprintf(stderr, "// wait 1min until light off //\n");
@@ -348,8 +360,9 @@ void setupPins()
 
 int main(int argc, char *argv[])
 {
-  setbuf(stdout, NULL); // disable buffering. write logs immediately for best reliability
-  setbuf(stderr, NULL); // disable buffering. write logs immediately for best reliability
+  // disable buffering. write logs immediately for debug purposes
+  setbuf(stdout, NULL);
+  setbuf(stderr, NULL);
 
   setupPins();
 
@@ -360,16 +373,20 @@ int main(int argc, char *argv[])
   // nope. keep working. look to wiringPiISR that doing actual irq listening work
   for (;;)
   {
-    checkDelay();
-    sleep(CHECK_DELAY); // seconds
+    check_delay();
+
     if (highHumiditySince == null) {
       float humidity = get_humidity();
       if (humidity >= HIGH_HUMIDITY) {
         highHumiditySince = seconds();
+        fprintf(stderr, "high humidity detected\n");
       }
     } else if (seconds() - highHumiditySince > 40 * MIN) {
       highHumiditySince = null;
+      fprintf(stderr, "humidity normalized\n");
     }
+
+    sleep(CHECK_DELAY); // seconds
   }
 
   return 0;
