@@ -1,20 +1,7 @@
 # rpi-light-ctr
 Yet another light controller for raspberry pi. ISR Interruptons. optional MQTT. C 
 
-Hub repo: [home-things/rpi-tg-bot](https://github.com/home-things/rpi-tg-bot)
+# Experimental branch. Try to publish and subscribe to mqtt
 
-### compile & run
-```
-sudo make ACTIVE_TIME_LIMIT=1 LIGHT_PIN=8 PIR_S_PIN=0 CORR_TIME=0 DURATION=20 \
-   MQTT_SUBSCRIBE=1 MQTT_TOPIC=home/light MQTT_BROKER_HOST=192.168.0.144
-```
-
-### crontab
-```
-@reboot gpio mode 8 out # light (addition; ceiling)
-@reboot gpio mode 0 in  # pir_s
-@reboot cd /home/pi/services/light-ctr; ./isr 2>>./log
-```
- ### pre-requisites
--  `sudo apt install mpg321` # optional dependency for beeping
--  `sudo apt-get -y install libmosquitto-dev mosquitto-dev` # for mqtt server/client
+- sending works ok, but daemon auto-run broken, probably because of mqtt coordinator might be unavailable
+- subscribing does not work still
