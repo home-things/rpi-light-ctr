@@ -67,11 +67,12 @@
 #define LIGHT_SW_PIN  (0)
 #endif
 
-#define HIGH_HUMIDITY (70)
+#define HIGH_HUMIDITY (50)
 
 #define ALLOWED_MOV_DOOR_CLSD_TIME (3) /* sec */
 #define NO_MOV_DOOR_CLSD_TIME (30) /* sec */
 #define HIGHHUM_NO_MOV_DOOR_CLSD_TIME (8) /* sec */
+#define HIGHHUM_NO_MOV_TIME (30) /* sec */
 
 unsigned long lastMovingTime = null; // sec
 unsigned long fanStartedAt = null; // sec
@@ -271,44 +272,46 @@ unsigned get_fan_duration()
 
 void check_delay(void)
 {
+
+  //
+  // LIGHT: turn off by timer
+  //
+
   bool isLightOn = checkAnyLightOn();
-  bool shouldBeLight = seconds() - lastMovingTime <= DURATION * MIN;
-  if (!lastMovingTime)
-    return;
-
-  //
-  // LIGHT
-  //
-
+  bool shouldBeLight = lastMovingTime - seconds()  >= DURATION * MIN;
+  bool shouldFanOn = lastMovingTime - seconds()  >= HIGHHUM_NO_MOV_TIME;
   if (isLightOn)
   {
     fprintf(stderr, "check: diff: %ld, light is on ~~ fan started at: %d, fan on: %d // last_mov-door_closed: %ld\n", seconds() - lastMovingTime, fanStartedAt, digitalRead(FAN_R_PIN), lastMovingTime - doorClosedAt);
   }
 
-  if (!shouldBeLight && isLightOn)
+  if ((!shouldBeLight && isLightOn))// || shouldFanOn && digitalRead(FAN_R_PIN))
   {
     print_debug("moving timeout --> turn light off\n");
     toggleLightFan(false);
   }
 
   //
-  // FAN
+  // FAN: turn off by timer
   //
 
-  // fanStartedAt определяется после toggleLightFan
-  unsigned char hour = getHour();
-  bool isSilentHour = hour >= SILENT_SINCE || hour < ACTIVE_SINCE;
-  bool isLastMovingTooShort = (lastMovingTime - startMovingAt) <= 1 * MIN;
-  unsigned fanDuration = get_fan_duration() * MIN;
-  bool shouldFanOn = seconds() - fanStartedAt <= fanDuration;
-  if (!shouldFanOn && fanStartedAt) {
-    fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld, duration: %ldsec, silent: %d, movShort: %d, duration: %dmin, silent (real): %d, last moving duration: %ldsec, 1min: %d\n", seconds(), fanStartedAt, seconds() - fanStartedAt, fanDuration, isSilentHour, isLastMovingTooShort, isSilentHour || isLastMovingTooShort ? SHORT_FAN_DURATION : DURATION, hour >= SILENT_SINCE || hour < ACTIVE_SINCE, lastMovingTime - startMovingAt, MIN);
-    digitalWrite(FAN_R_PIN, 0);
-    fanStartedAt = null;
+  if (lastMovingTime) {
+    // fanStartedAt определяется после toggleLightFan
+    unsigned char hour = getHour();
+    bool isSilentHour = hour >= SILENT_SINCE || hour < ACTIVE_SINCE;
+    bool isLastMovingTooShort = (lastMovingTime - startMovingAt) <= 1 * MIN;
+    unsigned fanDuration = get_fan_duration() * MIN;
+    bool shouldFanOn = seconds() - fanStartedAt <= fanDuration;
+    if (!shouldFanOn && fanStartedAt) {
+      fprintf(stderr, "fan is over --> turn off / now: %ld, start: %d, diff: %ld, duration: %ldsec\n", seconds(), fanStartedAt, seconds() - fanStartedAt, fanDuration);
+          //silent: %d, movShort: %d, duration: %dmin, silent (real): %d, last moving duration: %ldsec, 1min: %d\n", seconds(), fanStartedAt, seconds() - fanStartedAt, fanDuration, isSilentHour, isLastMovingTooShort, isSilentHour || isLastMovingTooShort ? SHORT_FAN_DURATION : DURATION, hour >= SILENT_SINCE || hour < ACTIVE_SINCE, lastMovingTime - startMovingAt, MIN);
+      digitalWrite(FAN_R_PIN, 0);
+      fanStartedAt = null;
+    }
   }
 
   //
-  // DOOR
+  // DOOR: turn light off and fan on much faster
   //
 
   // В момент закрытия двери есть небольшой разрешённый промежуток срабатыванию датчика движения, после которого идёт ожидается ещё около минуты и свет выключается. 
@@ -317,18 +320,20 @@ void check_delay(void)
   // 1. в момент закрытия может быть движение, 
   // 2. а ещё может выйти один человек, но остаться внутри другой (например за утренней чисткой зубов =)
   // см схему: https://www.notion.so/thsm/pir-b01f448c3fbb417480e4f0f3a5adcfff 
-  if (lastMovingTime - doorClosedAt <= ALLOWED_MOV_DOOR_CLSD_TIME && isLightOn)
+  fprintf(stderr, "DOOR: %d - %d = %d <= ALLOWED %d; l: %d, f: %d\n", lastMovingTime, doorClosedAt, lastMovingTime - doorClosedAt, ALLOWED_MOV_DOOR_CLSD_TIME, isLightOn, digitalRead(FAN_R_PIN));
+  if (lastMovingTime - doorClosedAt <= ALLOWED_MOV_DOOR_CLSD_TIME && (isLightOn || !digitalRead(FAN_R_PIN)))
   {
-    const awaitTime = highHumiditySince
+    const int awaitTime = highHumiditySince
       ? HIGHHUM_NO_MOV_DOOR_CLSD_TIME
       : NO_MOV_DOOR_CLSD_TIME;
     if (seconds() - doorClosedAt >= awaitTime) {
-      fprintf(stderr, "hasn't motion after door closed && 1 min gone\n");
+      fprintf(stderr, "hasn't motion after door closed && %d seconds left\n", awaitTime);
+      if (highHumiditySince) fprintf(stderr, "started earlier due to highHumidity\n");
       toggleLightFan(false);
     } else {
-      fprintf(stderr, "// wait 1min until light off //\n");
+      fprintf(stderr, "// door closed recently: wait %d seconds until light off //\n", awaitTime);
     }
-  }
+  } 
 }
 
 void setupPins()
@@ -373,8 +378,6 @@ int main(int argc, char *argv[])
   // nope. keep working. look to wiringPiISR that doing actual irq listening work
   for (;;)
   {
-    check_delay();
-
     if (highHumiditySince == null) {
       float humidity = get_humidity();
       if (humidity >= HIGH_HUMIDITY) {
@@ -385,6 +388,8 @@ int main(int argc, char *argv[])
       highHumiditySince = null;
       fprintf(stderr, "humidity normalized\n");
     }
+
+    check_delay();
 
     sleep(CHECK_DELAY); // seconds
   }
